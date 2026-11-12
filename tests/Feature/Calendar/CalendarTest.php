@@ -2,24 +2,81 @@
 
 namespace Tests\Feature\Calendar;
 
+use App\Models\CalendarEvent;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 class CalendarTest extends TestCase
 {
-    public function test_calendar_shows_deadlines_and_schedule_controls(): void
-    {
-        $response = $this->get(route('calendar'));
+    use LazilyRefreshDatabase;
 
-        $response
+    public function test_calendar_renders_database_deadlines_and_persisted_schedule_events(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create(['name' => 'Product Design']);
+        Task::factory()->for($project)->create([
+            'created_by_id' => $user->getKey(),
+            'title' => 'Finalize mobile app wireframes',
+            'due_date' => today(),
+        ]);
+        Task::factory()->for($project)->create([
+            'created_by_id' => $user->getKey(),
+            'title' => 'Review design notes',
+            'due_date' => today()->addDay(),
+        ]);
+        CalendarEvent::factory()->for($user)->create([
+            'title' => 'Quarterly planning',
+            'date' => today()->addDays(2),
+            'time' => '10:30',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('calendar'))
             ->assertOk()
             ->assertSee('Calendar')
-            ->assertSee('2 deadlines due today')
+            ->assertSee('1 deadline due today')
             ->assertSee('1 more due tomorrow')
             ->assertSee('Finalize mobile app wireframes')
+            ->assertSee('Quarterly planning')
             ->assertSee('data-calendar-filter="deadline"', false)
             ->assertSee('data-calendar-schedule-form', false)
-            ->assertSee('data-theme-authenticated="false"', false)
-            ->assertSee('aria-current="page"', false)
-            ->assertSee(route('dashboard').'#task-row-sample-task-1', false);
+            ->assertSee('data-calendar-schedules', false);
+    }
+
+    public function test_schedule_creation_persists_to_the_authenticated_users_calendar(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson(route('calendar.events.store'), [
+                'title' => 'Sprint review',
+                'date' => today()->addDays(2)->toDateString(),
+                'time' => '14:15',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('event.title', 'Sprint review')
+            ->assertJsonPath('event.time', '14:15');
+
+        $this->assertDatabaseHas('calendar_events', [
+            'user_id' => $user->getKey(),
+            'title' => 'Sprint review',
+            'time' => '14:15',
+        ]);
+    }
+
+    public function test_user_cannot_remove_another_users_schedule(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $event = CalendarEvent::factory()->for($otherUser)->create();
+
+        $this->actingAs($owner)
+            ->deleteJson(route('calendar.events.destroy', ['calendarEvent' => $event]))
+            ->assertNotFound();
+
+        $this->assertModelExists($event);
     }
 }

@@ -69,7 +69,7 @@
                 <div class="grid gap-5 md:grid-cols-2">
                     <div>
                         <label for="profile-name" class="text-sm font-semibold text-slate-700">Full name</label>
-                        <input id="profile-name" name="name" type="text" required maxlength="120" autocomplete="name" value="{{ old('name', $user->name) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('name') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        <input id="profile-name" name="name" type="text" maxlength="120" autocomplete="name" value="{{ old('name', $user->name) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('name') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                         @error('name')
                             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -77,7 +77,7 @@
 
                     <div>
                         <label for="profile-email" class="text-sm font-semibold text-slate-700">Email address</label>
-                        <input id="profile-email" name="email" type="email" required maxlength="255" autocomplete="email" value="{{ old('email', $user->email) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('email') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        <input id="profile-email" name="email" type="email" maxlength="255" autocomplete="email" value="{{ old('email', $user->email) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('email') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                         @error('email')
                             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -174,7 +174,7 @@
                 <div class="grid gap-5 p-5 md:grid-cols-2 sm:p-6">
                     <div>
                         <label for="workspace-name" class="text-sm font-semibold text-slate-700">Workspace name</label>
-                        <input id="workspace-name" name="workspace_name" type="text" required maxlength="80" value="{{ old('workspace_name', $settings['workspace_name']) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('workspace_name') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        <input id="workspace-name" name="workspace_name" type="text" maxlength="80" value="{{ old('workspace_name', $settings['workspace_name']) }}" class="mt-2 block h-11 w-full rounded-xl border {{ $errors->has('workspace_name') ? 'border-red-300' : 'border-slate-200' }} bg-white px-3.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                         @error('workspace_name')
                             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                         @enderror

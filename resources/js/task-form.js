@@ -1,3 +1,4 @@
+import { showToast } from './toast';
 import { updateDashboardTaskStats } from './task-stats';
 
 const initializeTaskForm = () => {
@@ -11,6 +12,7 @@ const initializeTaskForm = () => {
     const successViewTaskButton = successModal?.querySelector('[data-success-view-task]');
     const modal = document.getElementById('create-task-modal');
     const taskList = document.getElementById('task-list');
+    const projectsRoot = document.querySelector('[data-projects-root]');
     const submitButton = document.getElementById('create-task-submit');
     const submitLabel = document.getElementById('create-task-submit-label');
     const modalTitle = document.getElementById('create-task-modal-title');
@@ -57,6 +59,7 @@ const initializeTaskForm = () => {
     let editingRow = null;
     let initialFormState = '';
     let createdTaskRow = null;
+    let refreshProjectsAfterCreate = false;
 
     // Keep select validation tied to the server-rendered options.
     const isOptionValue = (fieldName, value) => {
@@ -80,10 +83,6 @@ const initializeTaskForm = () => {
             case 'title': {
                 const title = titleInput.value.trim();
 
-                if (!title) {
-                    return 'Task name is required.';
-                }
-
                 if (title.length < 3) {
                     return 'Task name must be at least 3 characters.';
                 }
@@ -105,11 +104,7 @@ const initializeTaskForm = () => {
             case 'status':
                 return isOptionValue('status', fieldInputs.status.value) ? '' : 'Please choose a status.';
             case 'due_date':
-                if (!dueDateInput.value) {
-                    return 'Please select a due date.';
-                }
-
-                return currentMode === 'create' && dueDateInput.value < getTodayString()
+                return currentMode === 'create' && dueDateInput.value && dueDateInput.value < getTodayString()
                     ? "Due date can't be in the past."
                     : '';
             default:
@@ -371,68 +366,22 @@ const initializeTaskForm = () => {
         }
     });
 
-    // Create toast elements with textContent so user-provided text stays escaped.
-    const showToast = (type, message, detail = '') => {
-        let container = document.getElementById('toast-container');
-
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'fixed bottom-6 right-6 z-[60] flex flex-col gap-3';
-            container.setAttribute('aria-live', 'polite');
-            container.setAttribute('aria-atomic', 'false');
-            document.body.append(container);
-        }
-
-        const isSuccess = type === 'success';
-        const toast = document.createElement('div');
-        const iconCircle = document.createElement('span');
-        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const textContainer = document.createElement('div');
-        const messageElement = document.createElement('p');
-
-        toast.className = 'flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-xl transition-opacity duration-200';
-        iconCircle.className = isSuccess
-            ? 'flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600'
-            : 'flex size-6 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600';
-        icon.setAttribute('viewBox', '0 0 24 24');
-        icon.setAttribute('fill', 'none');
-        icon.setAttribute('stroke', 'currentColor');
-        icon.setAttribute('stroke-width', '2');
-        icon.setAttribute('stroke-linecap', 'round');
-        icon.setAttribute('stroke-linejoin', 'round');
-        icon.classList.add('size-4');
-        path.setAttribute('d', isSuccess ? 'M20 6 9 17l-5-5' : 'M18 6 6 18M6 6l12 12');
-        icon.append(path);
-        iconCircle.append(icon);
-        textContainer.className = 'min-w-0';
-        messageElement.className = 'font-semibold';
-        messageElement.textContent = message;
-        textContainer.append(messageElement);
-
-        if (detail) {
-            const detailElement = document.createElement('p');
-            detailElement.className = 'text-xs text-slate-500';
-            detailElement.textContent = detail;
-            textContainer.append(detailElement);
-        }
-
-        toast.append(iconCircle, textContainer);
-        container.append(toast);
-
-        window.setTimeout(() => {
-            toast.classList.add('opacity-0');
-            window.setTimeout(() => toast.remove(), 200);
-        }, 4000);
-    };
-
     successModal?.addEventListener('modal:close', () => {
+        const shouldRefreshProjects = refreshProjectsAfterCreate;
+        refreshProjectsAfterCreate = false;
         createdTaskRow = null;
+        if (successViewTaskButton) {
+            successViewTaskButton.textContent = 'View Task';
+        }
+
+        if (shouldRefreshProjects) {
+            window.location.reload();
+        }
     });
 
     successViewTaskButton?.addEventListener('click', () => {
         const taskRow = createdTaskRow;
+        const shouldRefreshProjects = refreshProjectsAfterCreate;
 
         if (!window.Modal.close(successModal.id)) {
             console.error('The task success dialog could not close.');
@@ -440,7 +389,17 @@ const initializeTaskForm = () => {
             return;
         }
 
+        if (shouldRefreshProjects) {
+            return;
+        }
+
         if (!taskRow?.isConnected) {
+            if (taskRow && form.dataset.dashboardUrl) {
+                const dashboardUrl = new URL(form.dataset.dashboardUrl, window.location.origin);
+                dashboardUrl.hash = `task-row-${taskRow.dataset.taskId}`;
+                window.location.assign(dashboardUrl);
+            }
+
             return;
         }
 
@@ -449,19 +408,36 @@ const initializeTaskForm = () => {
     });
 
     const showCreateSuccess = (taskRow) => {
+        const shouldRefreshProjects = Boolean(
+            projectsRoot
+            && taskRow.dataset.taskPriority === 'High',
+        );
+
         if (!successModal || !successViewTaskButton) {
             console.error('The task success dialog is missing from the page.');
             showToast('success', 'Task created', taskRow.dataset.taskTitle ?? '');
+
+            if (shouldRefreshProjects) {
+                window.setTimeout(() => window.location.reload(), 1000);
+            }
 
             return;
         }
 
         createdTaskRow = taskRow;
+        refreshProjectsAfterCreate = shouldRefreshProjects;
+        successViewTaskButton.textContent = shouldRefreshProjects ? 'View project' : 'View Task';
 
         if (!window.Modal.open(successModal.id)) {
             createdTaskRow = null;
+            refreshProjectsAfterCreate = false;
+            successViewTaskButton.textContent = 'View Task';
             console.error('The task success dialog could not be opened.');
             showToast('success', 'Task created', taskRow.dataset.taskTitle ?? '');
+
+            if (shouldRefreshProjects) {
+                window.setTimeout(() => window.location.reload(), 1000);
+            }
         }
     };
 
@@ -487,7 +463,7 @@ const initializeTaskForm = () => {
             : 'New tasks default to Open until they are marked as In Progress.';
         taskFormNote.textContent = isEditing
             ? 'Your changes will be visible to teammates after you save.'
-            : 'Task name, project, priority, status, and due date are required before you can create the task.';
+            : 'Add the task details you want to track and save when you\'re ready.';
         methodOverride.value = isEditing ? 'PATCH' : '';
         form.action = isEditing ? form.dataset.updateUrl : form.dataset.createAction;
         dueDateInput.min = isEditing ? '' : dueDateMinimum;
@@ -557,7 +533,7 @@ const initializeTaskForm = () => {
         setFormMode('edit');
         titleInput.value = row.dataset.taskTitle ?? '';
         descriptionInput.value = row.dataset.taskDescription ?? '';
-        fieldInputs.project.value = row.dataset.taskProject ?? '';
+        fieldInputs.project.value = row.dataset.taskProjectId ?? '';
         fieldInputs.priority.value = row.dataset.taskPriority ?? '';
         fieldInputs.status.value = row.dataset.taskStatus ?? '';
         dueDateInput.value = row.dataset.taskDueDate ?? '';
@@ -698,10 +674,9 @@ const initializeTaskForm = () => {
         const returnedRow = rowMarkup.content.firstElementChild;
 
         if (
-            !taskList
-            || !returnedRow?.matches('[data-task-row]')
+            !returnedRow?.matches('[data-task-row]')
             || rowMarkup.content.childElementCount !== 1
-            || (isEditing && !rowToReplace?.isConnected)
+            || (isEditing && (!taskList || !rowToReplace?.isConnected))
         ) {
             console.error('The task save response did not contain a replaceable task row.');
             showToast('error', failureMessage);
@@ -722,17 +697,20 @@ const initializeTaskForm = () => {
             return;
         }
 
-        if (isEditing) {
-            rowToReplace.replaceWith(returnedRow);
-            returnedRow.querySelector('[data-edit-task]')?.focus();
-        } else {
-            taskList.prepend(returnedRow);
+        if (taskList) {
+            if (isEditing) {
+                rowToReplace.replaceWith(returnedRow);
+                returnedRow.querySelector('[data-edit-task]')?.focus();
+            } else {
+                taskList.prepend(returnedRow);
+            }
+
+            taskList.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
+            returnedRow.classList.add('transition-colors', 'duration-1000', 'bg-indigo-50/60');
+            window.setTimeout(() => returnedRow.classList.remove('bg-indigo-50/60'), 2500);
+
+            updateDashboardTaskStats(previousStatus, taskStatus, isEditing ? 0 : 1);
         }
-
-        returnedRow.classList.add('transition-colors', 'duration-1000', 'bg-indigo-50/60');
-        window.setTimeout(() => returnedRow.classList.remove('bg-indigo-50/60'), 2500);
-
-        updateDashboardTaskStats(previousStatus, taskStatus, isEditing ? 0 : 1);
 
         if (isEditing) {
             showToast('success', payload.message ?? 'Task updated', taskTitle);

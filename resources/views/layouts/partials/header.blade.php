@@ -5,18 +5,46 @@
     @endphp
 
     {{-- Search --}}
-    <div class="relative w-full max-w-md">
+    <form
+        method="GET"
+        action="{{ route('dashboard') }}"
+        role="search"
+        class="relative w-full max-w-md"
+        data-task-search-form
+        data-task-search-suggestions-url="{{ route('tasks.search-suggestions') }}"
+    >
+        <label for="header-task-search" class="sr-only">Search tasks</label>
         <x-icon name="search" class="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
-        <input type="text" placeholder="Search tasks, people, or projects"
-               class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 placeholder:text-slate-900/50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-    </div>
+        <input
+            id="header-task-search"
+            type="search"
+            name="q"
+            value="{{ is_string(request('q')) ? request('q') : '' }}"
+            placeholder="Search tasks"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="task-search-suggestions"
+            aria-describedby="task-search-status"
+            autocomplete="off"
+            class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 placeholder:text-slate-900/50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        >
+        <ul
+            id="task-search-suggestions"
+            role="listbox"
+            aria-label="Task suggestions"
+            hidden
+            class="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+        ></ul>
+        <span id="task-search-status" class="sr-only" role="status" aria-live="polite"></span>
+    </form>
 
     {{-- Actions --}}
     <div class="ml-auto flex items-center gap-2">
-        <button type="button" class="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50" aria-label="Notifications">
+        <a href="{{ route('inbox') }}" class="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50" aria-label="Notifications">
             <x-icon name="bell" class="size-5" />
-            <span class="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white"></span>
-        </button>
+            <span data-header-inbox-count aria-label="{{ $unreadInboxCount }} unread notifications" class="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white ring-2 ring-white {{ $unreadInboxCount === 0 ? 'hidden' : '' }}">{{ $unreadInboxCount }}</span>
+        </a>
 
         <form
             method="POST"
@@ -42,9 +70,11 @@
         </form>
         <span data-theme-toggle-status role="status" aria-live="polite" aria-atomic="true" class="sr-only"></span>
 
-        <button type="button" data-modal-open="create-task-modal" class="flex h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700">
-            <x-icon name="plus" class="size-[18px]" />
-            <span>New task</span>
-        </button>
+        @if ($canCreateTasks)
+            <button type="button" data-modal-open="create-task-modal" class="flex h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700">
+                <x-icon name="plus" class="size-[18px]" />
+                <span>New task</span>
+            </button>
+        @endif
     </div>
 </header>

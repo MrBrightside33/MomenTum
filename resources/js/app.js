@@ -1,9 +1,14 @@
 import './modal';
+import './toast';
 import './task-form';
 import './task-delete';
+import './task-status';
+import './task-filters';
+import './task-search';
 import './inbox';
 import './calendar';
 import './projects';
 import './team';
 import './settings';
 import './theme-toggle';
+import './admin';

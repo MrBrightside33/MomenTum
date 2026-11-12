@@ -34,6 +34,6 @@ export const updateDashboardTaskStats = (previousStatus, nextStatus, totalChange
         throw new Error('Missing dashboard stat note.');
     }
 
-    totalNote.textContent = `${total - completed} open + ${completed} completed`;
+    totalNote.textContent = `${total - inProgress - completed} open`;
     completedNote.textContent = `${completed} completed`;
 };

@@ -1,4 +1,5 @@
 import { updateDashboardTaskStats } from './task-stats';
+import { showToast } from './toast';
 
 const initializeTaskDeletion = () => {
     const modal = document.getElementById('delete-task-modal');
@@ -25,6 +26,28 @@ const initializeTaskDeletion = () => {
     const showError = (message) => {
         error.textContent = message;
         error.classList.remove('hidden');
+    };
+
+    const removeDeletedTask = (deletedStatus) => {
+        const deletedRow = taskRow;
+        allowClose = true;
+        const modalClosed = window.Modal.close(modal.id);
+        allowClose = false;
+
+        if (!modalClosed) {
+            console.error('The delete confirmation could not close after a successful response.');
+            showError("Couldn't delete the task. Please try again.");
+            setSubmitting(false);
+
+            return false;
+        }
+
+        deletedRow.remove();
+        document.getElementById('task-list')?.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
+        updateDashboardTaskStats(deletedStatus, null, -1);
+        document.querySelector('header [data-modal-open="create-task-modal"]')?.focus();
+
+        return true;
     };
 
     const setSubmitting = (submitting) => {
@@ -176,30 +199,26 @@ const initializeTaskDeletion = () => {
             return;
         }
 
-        if (!response.ok || payload.task_id !== taskRow.dataset.taskId) {
-            showError(payload.message ?? "Couldn't delete the task. Please try again.");
-            setSubmitting(false);
-
-            return;
-        }
-
         const deletedStatus = taskRow.dataset.taskStatus;
-        const deletedRow = taskRow;
-        allowClose = true;
-        const modalClosed = window.Modal.close(modal.id);
-        allowClose = false;
 
-        if (!modalClosed) {
-            console.error('The delete confirmation could not close after a successful response.');
-            showError("Couldn't delete the task. Please try again.");
+        if (response.status === 404) {
+            if (removeDeletedTask(deletedStatus)) {
+                showToast('info', 'Task already deleted', 'Removed it from your list.');
+            }
+
+            return;
+        }
+
+        if (!response.ok || String(payload.task_id) !== taskRow.dataset.taskId) {
+            showError(response.status === 403
+                ? "You don't have permission to delete this task."
+                : "Couldn't delete the task. Please try again.");
             setSubmitting(false);
 
             return;
         }
 
-        deletedRow.remove();
-        updateDashboardTaskStats(deletedStatus, null, -1);
-        document.querySelector('header [data-modal-open="create-task-modal"]')?.focus();
+        removeDeletedTask(deletedStatus);
     });
 };
 

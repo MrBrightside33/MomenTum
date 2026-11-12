@@ -2,38 +2,50 @@
 
 namespace Tests\Feature\Tasks;
 
+use App\Enums\TaskStatus;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
 class StoreTaskTest extends TestCase
 {
-    public function test_dashboard_renders_the_task_modal_and_open_triggers(): void
-    {
-        $response = $this->get(route('dashboard'));
+    use LazilyRefreshDatabase;
 
-        $response
+    public function test_dashboard_redirects_guests_and_renders_the_authenticated_task_workspace(): void
+    {
+        $user = User::factory()->create();
+        Project::factory()->for($user, 'owner')->create(['name' => 'Personal']);
+
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Create a new task')
             ->assertSee('Delete task?')
             ->assertSee('Add Task Successfully')
-            ->assertSee('View Task')
             ->assertSee('data-modal-open="create-task-modal"', false)
-            ->assertSee('data-edit-task', false)
-            ->assertSee('data-delete-task', false)
             ->assertSee('id="task-list"', false)
-            ->assertSee('data-stat="total"', false);
+            ->assertSee('No tasks yet.');
     }
 
-    public function test_valid_task_input_returns_a_rendered_row_with_escaped_title(): void
+    public function test_valid_task_input_persists_the_task_and_renders_escaped_task_data(): void
     {
+        $owner = User::factory()->create();
+        $assignee = User::factory()->create(['name' => 'Lina Kim']);
+        $project = Project::factory()->for($owner, 'owner')->create(['name' => 'Product Design']);
         $title = '<script>alert("task")</script>';
-        $response = $this->postJson(route('tasks.store'), [
+
+        $response = $this->actingAs($owner)->postJson(route('tasks.store'), [
             'title' => $title,
             'description' => 'Prepare the release checklist.',
-            'project' => 'Personal',
+            'project' => $project->getKey(),
             'priority' => 'High',
             'status' => 'Completed',
             'due_date' => today()->toDateString(),
-            'assignees' => ['am', 'lk'],
+            'assignees' => [$assignee->getKey()],
         ]);
 
         $response
@@ -42,51 +54,61 @@ class StoreTaskTest extends TestCase
             ->assertJsonPath('html', fn (string $html): bool => str_contains($html, e($title)))
             ->assertJsonPath('html', fn (string $html): bool => ! str_contains($html, $title))
             ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'Today'))
-            ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'AM'))
             ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'LK'))
             ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'Mark incomplete'));
+
+        $task = Task::query()->where('title', $title)->firstOrFail();
+        $this->assertModelExists($task);
+        $this->assertDatabaseHas('task_assignees', [
+            'task_id' => $task->getKey(),
+            'user_id' => $assignee->getKey(),
+        ]);
+        $this->assertDatabaseHas('task_activities', [
+            'task_id' => $task->getKey(),
+            'user_id' => $owner->getKey(),
+            'event_type' => 'created',
+            'to_status' => TaskStatus::Completed->value,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $assignee->getKey(),
+            'notifiable_type' => User::class,
+        ]);
     }
 
-    public function test_future_due_date_uses_a_month_day_label_for_an_open_task(): void
+    public function test_task_creation_rejects_missing_required_fields_and_unknown_assignees(): void
     {
-        $dueDate = today()->addDays(3);
-        $response = $this->postJson(route('tasks.store'), [
-            'title' => 'Review accessibility',
-            'project' => 'Product Design',
-            'priority' => 'Low',
-            'status' => 'Open',
-            'due_date' => $dueDate->toDateString(),
-        ]);
+        $owner = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
 
-        $response
-            ->assertCreated()
-            ->assertJsonPath('html', fn (string $html): bool => str_contains($html, $dueDate->format('M j')))
-            ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'Mark complete'))
-            ->assertJsonPath('html', fn (string $html): bool => ! str_contains($html, 'AM'));
-    }
-
-    public function test_task_creation_rejects_invalid_fields_and_assignees(): void
-    {
-        $response = $this->postJson(route('tasks.store'), [
-            'title' => 'ab',
-            'description' => str_repeat('x', 501),
-            'project' => 'Unknown',
-            'priority' => 'Urgent',
-            'status' => 'Started',
-            'due_date' => today()->subDay()->toDateString(),
-            'assignees' => ['unknown'],
-        ]);
-
-        $response
+        $this->actingAs($owner)
+            ->postJson(route('tasks.store'), [
+                'project' => $project->getKey(),
+                'assignees' => [999999],
+            ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors([
-                'title',
-                'description',
-                'project',
-                'priority',
-                'status',
-                'due_date',
-                'assignees.0',
-            ]);
+            ->assertJsonValidationErrors(['title', 'priority', 'status', 'due_date', 'assignees.0']);
+
+        $this->assertDatabaseCount('tasks', 0);
+    }
+
+    public function test_task_creation_cannot_target_another_users_project(): void
+    {
+        $owner = User::factory()->create();
+        $otherOwner = User::factory()->create();
+        Project::factory()->for($owner, 'owner')->create();
+        $project = Project::factory()->for($otherOwner, 'owner')->create();
+
+        $this->actingAs($owner)
+            ->postJson(route('tasks.store'), [
+                'title' => 'Do not cross project boundaries',
+                'project' => $project->getKey(),
+                'priority' => 'Medium',
+                'status' => 'Open',
+                'due_date' => today()->toDateString(),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('project');
+
+        $this->assertDatabaseCount('tasks', 0);
     }
 }

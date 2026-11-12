@@ -6,6 +6,7 @@ const initializeCalendar = () => {
     }
 
     const taskData = root.querySelector('[data-calendar-tasks]');
+    const scheduleData = root.querySelector('[data-calendar-schedules]');
     const calendarGrid = root.querySelector('[data-calendar-grid]');
     const monthLabel = root.querySelector('[data-calendar-month]');
     const todayLabel = root.querySelector('[data-calendar-today-label]');
@@ -19,30 +20,31 @@ const initializeCalendar = () => {
     const dueTodayCount = root.querySelector('[data-calendar-due-today-count]');
     const upcomingCount = root.querySelector('[data-calendar-upcoming-count]');
     const scheduleForm = root.querySelector('[data-calendar-schedule-form]');
+    const scheduleSubmitButton = scheduleForm?.querySelector('button[type="submit"]');
     const scheduleDateInput = scheduleForm?.elements.namedItem('date');
     const scheduleTitleInput = scheduleForm?.elements.namedItem('title');
     const statusMessage = root.querySelector('[data-calendar-status]');
     const notificationButton = root.querySelector('[data-calendar-enable-notifications]');
     const filterButtons = Array.from(root.querySelectorAll('[data-calendar-filter]'));
     const today = root.dataset.today;
-    const storageKey = 'momentum.calendar.schedules.v1';
+    const scheduleDeleteUrlTemplate = root.dataset.calendarDeleteUrlTemplate;
     const notifiedTaskIds = new Set();
     let activeFilter = 'all';
     let selectedDate = today;
     let monthDate;
     let currentToday = today;
     let schedules = [];
-    let scheduleSequence = 0;
 
-    if (!taskData || !calendarGrid || !today) {
+    if (!taskData || !scheduleData || !calendarGrid || !today) {
         console.error('Calendar initialization is missing required page data.');
         return;
     }
 
     const taskEvents = JSON.parse(taskData.textContent || '[]');
+    const storedSchedules = JSON.parse(scheduleData.textContent || '[]');
 
-    if (!Array.isArray(taskEvents)) {
-        console.error('Calendar task data must be an array.');
+    if (!Array.isArray(taskEvents) || !Array.isArray(storedSchedules)) {
+        console.error('Calendar data must be arrays.');
         return;
     }
 
@@ -103,41 +105,10 @@ const initializeCalendar = () => {
         && typeof schedule.time === 'string'
         && (schedule.time === '' || /^\d{2}:\d{2}$/.test(schedule.time));
 
-    const loadSchedules = () => {
-        try {
-            const storedSchedules = localStorage.getItem(storageKey);
-
-            if (!storedSchedules) {
-                return [];
-            }
-
-            const parsedSchedules = JSON.parse(storedSchedules);
-
-            if (!Array.isArray(parsedSchedules) || !parsedSchedules.every(isValidSchedule)) {
-                throw new TypeError('Saved calendar schedules have an invalid format.');
-            }
-
-            return parsedSchedules;
-        } catch (error) {
-            console.error('Unable to load saved calendar schedules.', error);
-            announce('Saved schedules could not be loaded from this browser.');
-
-            return [];
-        }
-    };
-
-    const saveSchedules = () => {
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(schedules));
-
-            return true;
-        } catch (error) {
-            console.error('Unable to save calendar schedules.', error);
-            announce('Schedule could not be saved. Check that browser storage is available.');
-
-            return false;
-        }
-    };
+    if (!storedSchedules.every(isValidSchedule)) {
+        console.error('Calendar schedule data has an invalid format.');
+        return;
+    }
 
     const getAllEvents = () => [
         ...taskEvents.map((event) => ({...event, kind: 'deadline'})),
@@ -493,7 +464,7 @@ const initializeCalendar = () => {
         renderCalendar();
     };
 
-    schedules = loadSchedules();
+    schedules = storedSchedules;
     updateNotificationButton();
     renderCalendar();
     renderUpcomingDeadlines();
@@ -522,7 +493,7 @@ const initializeCalendar = () => {
         notifyUpcomingDeadlines();
     }, 60_000);
 
-    root.addEventListener('click', (event) => {
+    root.addEventListener('click', async (event) => {
         if (!(event.target instanceof Element)) {
             return;
         }
@@ -532,7 +503,7 @@ const initializeCalendar = () => {
         const filterButton = event.target.closest('[data-calendar-filter]');
         const deleteScheduleButton = event.target.closest('[data-calendar-delete-schedule]');
 
-        if (deleteScheduleButton) {
+        if (deleteScheduleButton instanceof HTMLButtonElement) {
             const scheduleId = deleteScheduleButton.dataset.calendarDeleteSchedule;
             const scheduleIndex = schedules.findIndex((schedule) => schedule.id === scheduleId);
 
@@ -542,16 +513,42 @@ const initializeCalendar = () => {
                 return;
             }
 
-            const [removedSchedule] = schedules.splice(scheduleIndex, 1);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            const deleteUrl = scheduleDeleteUrlTemplate?.replace('__event_id__', encodeURIComponent(scheduleId));
 
-            if (!saveSchedules()) {
-                schedules.splice(scheduleIndex, 0, removedSchedule);
+            if (!csrfToken || !deleteUrl) {
+                announce('Schedule could not be removed. Refresh the page and try again.');
 
                 return;
             }
 
-            announce(`${removedSchedule.title} was removed from your calendar.`);
-            renderCalendar();
+            deleteScheduleButton.disabled = true;
+
+            try {
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const result = await response.json();
+
+                if (!response.ok || String(result.id) !== scheduleId) {
+                    announce(result.message ?? 'Schedule could not be removed. Please try again.');
+                    return;
+                }
+
+                const [removedSchedule] = schedules.splice(scheduleIndex, 1);
+                announce(`${removedSchedule.title} was removed from your calendar.`);
+                renderCalendar();
+            } catch (error) {
+                console.error('Calendar schedule deletion failed.', error);
+                announce('Schedule could not be removed. Please try again.');
+            } finally {
+                deleteScheduleButton.disabled = false;
+            }
 
             return;
         }
@@ -589,8 +586,12 @@ const initializeCalendar = () => {
         scheduleTitleInput.focus();
     });
 
-    scheduleForm?.addEventListener('submit', (event) => {
+    scheduleForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
+
+        if (!(scheduleForm instanceof HTMLFormElement) || !(scheduleSubmitButton instanceof HTMLButtonElement) || scheduleSubmitButton.disabled) {
+            return;
+        }
 
         const formData = new FormData(scheduleForm);
         const title = String(formData.get('title') || '').trim();
@@ -603,28 +604,47 @@ const initializeCalendar = () => {
             return;
         }
 
-        schedules.push({
-            id: `schedule-${Date.now()}-${scheduleSequence++}`,
-            title,
-            date,
-            time,
-        });
+        scheduleSubmitButton.disabled = true;
 
-        if (!saveSchedules()) {
-            schedules.pop();
+        try {
+            const response = await fetch(scheduleForm.action, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+            });
+            const result = await response.json();
 
-            return;
+            if (!response.ok) {
+                const validationMessage = Object.values(result.errors ?? {}).flat()[0];
+                announce(validationMessage ?? result.message ?? 'Schedule could not be saved. Please try again.');
+                return;
+            }
+
+            if (!isValidSchedule(result.event) || schedules.some((schedule) => schedule.id === result.event.id)) {
+                console.error('The calendar schedule response was invalid.');
+                announce('Schedule could not be saved. Refresh the page and try again.');
+                return;
+            }
+
+            schedules.push(result.event);
+            selectedDate = result.event.date;
+            monthDate = parseDate(selectedDate);
+            monthDate.setDate(1);
+            activeFilter = 'all';
+            updateFilterButtons();
+            scheduleForm.reset();
+            scheduleDateInput.value = selectedDate;
+            announce(`Schedule saved for ${formatDate(selectedDate, {month: 'long', day: 'numeric'})}.`);
+            renderCalendar();
+        } catch (error) {
+            console.error('Calendar schedule request failed.', error);
+            announce('Schedule could not be saved. Please try again.');
+        } finally {
+            scheduleSubmitButton.disabled = false;
         }
-
-        selectedDate = date;
-        monthDate = parseDate(date);
-        monthDate.setDate(1);
-        activeFilter = 'all';
-        updateFilterButtons();
-        scheduleForm.reset();
-        scheduleDateInput.value = selectedDate;
-        announce(`Schedule saved for ${formatDate(date, {month: 'long', day: 'numeric'})}.`);
-        renderCalendar();
     });
 
     notificationButton?.addEventListener('click', async () => {

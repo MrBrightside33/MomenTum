@@ -36,6 +36,8 @@
         'calendar-clock' => '<path d="M21 13.5V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M18.5 19.5 21 22l4-4"/><circle cx="17" cy="17" r="6"/>',
         'chart-column' => '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16V8"/><path d="M12 16V5"/><path d="M17 16v-9"/>',
         'shield-check' => '<path d="M12 3 5 6v6c0 5 3.41 8.78 7 10 3.59-1.22 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
+        'menu'         => '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+        'triangle-alert' => '<path d="m10.29 3.86-8.1 14.02A2 2 0 0 0 3.92 21h16.16a2 2 0 0 0 1.73-3.12l-8.1-14.02a2 2 0 0 0-3.46 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
         'zap'          => '<path d="M13 2 4 13h6l-1 9 9-11h-6l1-9Z"/>',
         'archive'      => '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
     ];

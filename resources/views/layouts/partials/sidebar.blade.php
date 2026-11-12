@@ -1,7 +1,7 @@
 @php
     $workspace = [
         ['label' => 'Overview', 'icon' => 'layout-grid', 'href' => route('dashboard'), 'active' => request()->routeIs('dashboard')],
-        ['label' => 'Inbox',    'icon' => 'inbox',       'href' => route('inbox'), 'active' => request()->routeIs('inbox'), 'badge' => 4],
+        ['label' => 'Inbox',    'icon' => 'inbox',       'href' => route('inbox'), 'active' => request()->routeIs('inbox')],
         ['label' => 'Calendar', 'icon' => 'calendar',    'href' => route('calendar'), 'active' => request()->routeIs('calendar')],
         ['label' => 'Projects', 'icon' => 'folder',      'href' => route('projects'), 'active' => request()->routeIs('projects')],
         ['label' => 'Team',     'icon' => 'users',       'href' => route('team'), 'active' => request()->routeIs('team')],
@@ -32,8 +32,8 @@
                           {{ !empty($item['active']) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}">
                     <x-icon :name="$item['icon']" class="size-[19px]" />
                     <span>{{ $item['label'] }}</span>
-                    @isset($item['badge'])
-                        <span data-inbox-sidebar-count aria-label="{{ $item['badge'] }} unread notifications" class="ml-auto rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] text-white">{{ $item['badge'] }}</span>
+                    @if ($item['label'] === 'Inbox')
+                        <span data-inbox-sidebar-count aria-label="{{ $unreadInboxCount }} unread notifications" class="ml-auto rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] text-white {{ $unreadInboxCount === 0 ? 'hidden' : '' }}">{{ $unreadInboxCount }}</span>
                     @endisset
                 </a>
             @endforeach

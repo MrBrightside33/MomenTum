@@ -105,9 +105,9 @@
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Tuesday, September 24</p>
                                     <h2 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">Good morning, Alex</h2>
                                 </div>
-                                <button type="button" class="flex size-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" aria-label="Add task">
+                                <span class="flex size-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" aria-hidden="true">
                                     <x-icon name="plus" class="size-[18px]" />
-                                </button>
+                                </span>
                             </div>
 
                             <div class="mt-5 grid gap-3 sm:grid-cols-3">

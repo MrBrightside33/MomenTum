@@ -3,8 +3,15 @@
 @section('title', 'Calendar · MomenTum')
 
 @section('content')
-    <div data-calendar-root data-today="{{ $today }}" class="space-y-6">
+    <div
+        data-calendar-root
+        data-today="{{ $today }}"
+        data-calendar-store-url="{{ route('calendar.events.store') }}"
+        data-calendar-delete-url-template="{{ route('calendar.events.destroy', ['calendarEvent' => '__event_id__']) }}"
+        class="space-y-6"
+    >
         <script type="application/json" data-calendar-tasks>@json($calendarTasks)</script>
+        <script type="application/json" data-calendar-schedules>@json($scheduleEvents)</script>
 
         {{-- Calendar heading and quick actions --}}
         <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -218,7 +225,8 @@
                         </div>
                     </div>
 
-                    <form data-calendar-schedule-form class="space-y-4">
+                    <form data-calendar-schedule-form method="POST" action="{{ route('calendar.events.store') }}" class="space-y-4">
+                        @csrf
                         <div>
                             <label for="calendar-schedule-title" class="text-sm font-semibold text-slate-700">Schedule title</label>
                             <input
@@ -226,7 +234,6 @@
                                 name="title"
                                 type="text"
                                 maxlength="100"
-                                required
                                 placeholder="e.g. Design review"
                                 class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                             >
@@ -240,7 +247,6 @@
                                     type="date"
                                     min="{{ $today }}"
                                     value="{{ $today }}"
-                                    required
                                     class="mt-1.5 h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                 >
                             </div>

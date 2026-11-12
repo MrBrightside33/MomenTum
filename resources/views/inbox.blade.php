@@ -15,6 +15,7 @@
             <button
                 type="button"
                 data-inbox-mark-all
+                data-inbox-mark-all-url="{{ route('inbox.read-all') }}"
                 class="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 sm:self-auto"
             >
                 <x-icon name="check" class="size-4 text-indigo-600" />
@@ -55,20 +56,26 @@
                 </div>
             </div>
 
-            <div id="inbox-list" class="divide-y divide-slate-100">
-                @foreach ($inboxGroups as $group => $notifications)
+            <div
+                id="inbox-list"
+                class="divide-y divide-slate-100"
+                data-inbox-all-count="{{ $inboxCounts['all'] }}"
+                data-inbox-unread-count="{{ $inboxCounts['unread'] }}"
+                data-inbox-archived-count="{{ $inboxCounts['archived'] }}"
+            >
+                @foreach ($inboxGroups as $group => $groupNotifications)
                     <section data-inbox-group aria-label="{{ $group }} updates">
                         <h2 class="bg-slate-50/70 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                             {{ $group }}
                         </h2>
 
-                        @foreach ($notifications as $notification)
+                        @foreach ($groupNotifications as $notification)
                             {{-- Single inbox notification --}}
                             <article
                                 data-inbox-item
                                 data-notification-id="{{ $notification['id'] }}"
                                 data-read="{{ $notification['read'] ? 'true' : 'false' }}"
-                                data-archived="false"
+                                data-archived="{{ $notification['archived'] ? 'true' : 'false' }}"
                                 data-search="{{ $notification['headline'] }} {{ $notification['detail'] }}"
                                 class="flex gap-3 px-4 py-4 transition-colors sm:gap-4 sm:px-5 {{ $notification['read'] ? 'bg-white' : 'bg-indigo-50/30' }}"
                             >
@@ -98,7 +105,7 @@
                                         </span>
                                         @if ($notification['task_id'])
                                             <a
-                                                href="{{ route('dashboard') }}#task-row-{{ $notification['task_id'] }}"
+                                                href="{{ $notification['url'] ?? (route('dashboard').'#task-row-'.$notification['task_id']) }}"
                                                 class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 focus:outline-none focus:underline"
                                             >
                                                 View task
@@ -113,6 +120,7 @@
                                     <button
                                         type="button"
                                         data-inbox-toggle-read
+                                        data-read-url="{{ route('inbox.read', ['notification' => $notification['id']]) }}"
                                         aria-label="{{ $notification['read'] ? 'Mark notification as unread' : 'Mark notification as read' }}"
                                         title="{{ $notification['read'] ? 'Mark as unread' : 'Mark as read' }}"
                                         class="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 {{ $notification['read'] ? 'bg-emerald-50 text-emerald-600' : '' }}"
@@ -122,6 +130,8 @@
                                     <button
                                         type="button"
                                         data-inbox-toggle-archive
+                                        data-archive-url="{{ route('inbox.archive', ['notification' => $notification['id']]) }}"
+                                        data-restore-url="{{ route('inbox.restore', ['notification' => $notification['id']]) }}"
                                         aria-label="Archive notification"
                                         title="Archive"
                                         class="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
@@ -134,6 +144,10 @@
                         @endforeach
                     </section>
                 @endforeach
+            </div>
+
+            <div class="px-5 py-4">
+                {{ $notifications->links() }}
             </div>
 
             {{-- Empty search and filter state --}}

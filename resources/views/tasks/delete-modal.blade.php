@@ -2,9 +2,9 @@
     {{-- Delete task confirmation --}}
     <form
         id="delete-task-form"
-        action="{{ route('tasks.destroy', ['taskId' => '__task_id__']) }}"
+        action="{{ route('tasks.destroy', ['task' => '__task_id__']) }}"
         method="POST"
-        data-delete-url-template="{{ route('tasks.destroy', ['taskId' => '__task_id__']) }}"
+        data-delete-url-template="{{ route('tasks.destroy', ['task' => '__task_id__']) }}"
         class="flex flex-col gap-5"
     >
         @csrf

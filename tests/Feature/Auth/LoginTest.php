@@ -95,6 +95,10 @@ class LoginTest extends TestCase
             'name' => 'Taylor Reed',
             'email' => 'taylor@example.com',
         ]);
+        $this->assertDatabaseHas('projects', [
+            'owner_id' => User::query()->where('email', 'taylor@example.com')->value('id'),
+            'name' => 'Personal',
+        ]);
     }
 
     public function test_register_page_renders_sign_up_fields_and_login_link(): void
@@ -119,6 +123,21 @@ class LoginTest extends TestCase
         $response = $this->post(route('logout'));
 
         $response->assertRedirectToRoute('home');
+        $this->assertGuest();
+    }
+
+    public function test_inactive_users_cannot_sign_in(): void
+    {
+        $user = User::factory()->inactive()->create();
+
+        $this->from(route('login'))
+            ->post(route('login.submit'), [
+                'email' => $user->email,
+                'password' => 'password',
+            ])
+            ->assertRedirectToRoute('login')
+            ->assertSessionHasErrors('email');
+
         $this->assertGuest();
     }
 }

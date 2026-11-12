@@ -14,17 +14,53 @@ const initializeInbox = () => {
     const markAllButton = document.querySelector('[data-inbox-mark-all]');
     const statusMessage = document.querySelector('[data-inbox-status]');
     const sidebarUnreadBadge = document.querySelector('[data-inbox-sidebar-count]');
+    const headerUnreadBadge = document.querySelector('[data-header-inbox-count]');
     let activeFilter = 'all';
+    let counts = {
+        all: Number.parseInt(inboxList.dataset.inboxAllCount ?? '0', 10),
+        unread: Number.parseInt(inboxList.dataset.inboxUnreadCount ?? '0', 10),
+        archived: Number.parseInt(inboxList.dataset.inboxArchivedCount ?? '0', 10),
+    };
 
     const getCounts = () => {
-        const activeNotifications = notifications.filter((notification) => notification.dataset.archived !== 'true');
-        const unreadNotifications = activeNotifications.filter((notification) => notification.dataset.read !== 'true');
+        return counts;
+    };
 
-        return {
-            all: activeNotifications.length,
-            unread: unreadNotifications.length,
-            archived: notifications.length - activeNotifications.length,
+    const updateCounts = (nextCounts) => {
+        counts = {
+            all: Number(nextCounts.all),
+            unread: Number(nextCounts.unread),
+            archived: Number(nextCounts.archived),
         };
+        inboxList.dataset.inboxAllCount = String(counts.all);
+        inboxList.dataset.inboxUnreadCount = String(counts.unread);
+        inboxList.dataset.inboxArchivedCount = String(counts.archived);
+    };
+
+    const sendUpdate = async (url, payload = {}) => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        if (!csrfToken || !url) {
+            throw new Error('Inbox request is missing its security token or endpoint.');
+        }
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.counts) {
+            throw new Error(result.message ?? 'The notification could not be updated.');
+        }
+
+        return result;
     };
 
     const updateNotification = (notification) => {
@@ -89,6 +125,12 @@ const initializeInbox = () => {
             sidebarUnreadBadge.classList.toggle('hidden', counts.unread === 0);
         }
 
+        if (headerUnreadBadge) {
+            headerUnreadBadge.textContent = String(counts.unread);
+            headerUnreadBadge.setAttribute('aria-label', `${counts.unread} unread notifications`);
+            headerUnreadBadge.classList.toggle('hidden', counts.unread === 0);
+        }
+
         if (markAllButton instanceof HTMLButtonElement) {
             markAllButton.disabled = counts.unread === 0;
             markAllButton.classList.toggle('opacity-50', markAllButton.disabled);
@@ -141,7 +183,7 @@ const initializeInbox = () => {
 
     searchInput?.addEventListener('input', updateInbox);
 
-    inboxList.addEventListener('click', (event) => {
+    inboxList.addEventListener('click', async (event) => {
         if (!(event.target instanceof Element)) {
             return;
         }
@@ -152,37 +194,86 @@ const initializeInbox = () => {
             return;
         }
 
-        if (event.target.closest('[data-inbox-toggle-read]')) {
-            notification.dataset.read = notification.dataset.read === 'true' ? 'false' : 'true';
-            updateNotification(notification);
-            updateInbox();
-            statusMessage.textContent = notification.dataset.read === 'true'
-                ? 'Notification marked as read.'
-                : 'Notification marked as unread.';
+        const readButton = event.target.closest('[data-inbox-toggle-read]');
+
+        if (readButton instanceof HTMLButtonElement) {
+            if (readButton.disabled) {
+                return;
+            }
+
+            readButton.disabled = true;
+
+            try {
+                const nextReadState = notification.dataset.read !== 'true';
+                const result = await sendUpdate(readButton.dataset.readUrl, { read: nextReadState });
+                notification.dataset.read = String(nextReadState);
+                updateCounts(result.counts);
+                updateNotification(notification);
+                updateInbox();
+                statusMessage.textContent = result.message;
+            } catch (error) {
+                console.error('Inbox read update failed.', error);
+                statusMessage.textContent = error.message;
+            } finally {
+                readButton.disabled = false;
+            }
 
             return;
         }
 
-        if (event.target.closest('[data-inbox-toggle-archive]')) {
-            notification.dataset.archived = notification.dataset.archived === 'true' ? 'false' : 'true';
-            updateNotification(notification);
-            updateInbox();
-            statusMessage.textContent = notification.dataset.archived === 'true'
-                ? 'Notification archived.'
-                : 'Notification restored to your inbox.';
+        const archiveButton = event.target.closest('[data-inbox-toggle-archive]');
+
+        if (archiveButton instanceof HTMLButtonElement) {
+            if (archiveButton.disabled) {
+                return;
+            }
+
+            archiveButton.disabled = true;
+
+            try {
+                const restoring = notification.dataset.archived === 'true';
+                const result = await sendUpdate(
+                    restoring ? archiveButton.dataset.restoreUrl : archiveButton.dataset.archiveUrl,
+                );
+                notification.dataset.archived = String(!restoring);
+                updateCounts(result.counts);
+                updateNotification(notification);
+                updateInbox();
+                statusMessage.textContent = result.message;
+            } catch (error) {
+                console.error('Inbox archive update failed.', error);
+                statusMessage.textContent = error.message;
+            } finally {
+                archiveButton.disabled = false;
+            }
         }
     });
 
-    markAllButton?.addEventListener('click', () => {
-        notifications.forEach((notification) => {
-            if (notification.dataset.archived !== 'true') {
-                notification.dataset.read = 'true';
-                updateNotification(notification);
-            }
-        });
+    markAllButton?.addEventListener('click', async () => {
+        if (!(markAllButton instanceof HTMLButtonElement) || markAllButton.disabled) {
+            return;
+        }
 
-        updateInbox();
-        statusMessage.textContent = 'All inbox notifications marked as read.';
+        markAllButton.disabled = true;
+
+        try {
+            const result = await sendUpdate(markAllButton.dataset.inboxMarkAllUrl);
+            notifications.forEach((notification) => {
+                if (notification.dataset.archived !== 'true') {
+                    notification.dataset.read = 'true';
+                    updateNotification(notification);
+                }
+            });
+
+            updateCounts(result.counts);
+            updateInbox();
+            statusMessage.textContent = result.message;
+        } catch (error) {
+            console.error('Inbox mark-all request failed.', error);
+            statusMessage.textContent = error.message;
+        } finally {
+            markAllButton.disabled = false;
+        }
     });
 };
 
