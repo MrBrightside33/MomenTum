@@ -1,5 +1,8 @@
 import { updateDashboardTaskStats } from './task-stats';
 import { showToast } from './toast';
+import { request } from './http';
+import { setButtonLoading } from './loading';
+import { UNDO_SECONDS } from './loading-config';
 
 const initializeTaskDeletion = () => {
     const modal = document.getElementById('delete-task-modal');
@@ -18,10 +21,10 @@ const initializeTaskDeletion = () => {
     const warning = document.getElementById('delete-task-warning');
     const error = document.getElementById('delete-task-error');
     const submitButton = document.getElementById('delete-task-submit');
-    const submitLabel = document.getElementById('delete-task-submit-label');
     let taskRow = null;
     let isSubmitting = false;
     let allowClose = false;
+    let restoreSubmitButton = null;
 
     const showError = (message) => {
         error.textContent = message;
@@ -53,7 +56,13 @@ const initializeTaskDeletion = () => {
     const setSubmitting = (submitting) => {
         isSubmitting = submitting;
         submitButton.disabled = submitting;
-        submitLabel.textContent = submitting ? 'Deleting…' : 'Delete task';
+
+        if (submitting) {
+            restoreSubmitButton = setButtonLoading(submitButton, { label: 'Moving task to trash…' });
+        } else if (restoreSubmitButton) {
+            restoreSubmitButton();
+            restoreSubmitButton = null;
+        }
     };
 
     const updatePreview = (row) => {
@@ -67,7 +76,7 @@ const initializeTaskDeletion = () => {
         status.textContent = taskStatus.toLowerCase();
         project.textContent = taskProject;
         due.textContent = row.querySelector('[data-task-due-label]')?.textContent ?? '';
-        warning.textContent = `This task and its activity history will be permanently deleted from ${taskProject} and removed for all assignees.`;
+        warning.textContent = `This task will move to trash and be permanently deleted after ${form.dataset.retentionDays} days.`;
 
         priority.className = 'rounded-full px-2.5 py-1 text-[11px] font-semibold';
         priority.classList.add(
@@ -167,58 +176,82 @@ const initializeTaskDeletion = () => {
 
         setSubmitting(true);
 
-        let response;
-
         try {
-            response = await fetch(form.action, {
+            const { data: payload } = await request(form.action, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: { 'X-CSRF-TOKEN': csrfToken },
                 body: new FormData(form),
             });
-        } catch (requestError) {
-            console.error('Task deletion request failed.', requestError);
-            showError("Couldn't delete the task. Please try again.");
-            setSubmitting(false);
 
-            return;
-        }
-
-        let payload;
-
-        try {
-            payload = await response.json();
-        } catch (responseError) {
-            console.error('Could not read the task deletion response.', responseError);
-            showError("Couldn't delete the task. Please try again.");
-            setSubmitting(false);
-
-            return;
-        }
-
-        const deletedStatus = taskRow.dataset.taskStatus;
-
-        if (response.status === 404) {
-            if (removeDeletedTask(deletedStatus)) {
-                showToast('info', 'Task already deleted', 'Removed it from your list.');
+            if (String(payload.task_id) !== taskRow.dataset.taskId) {
+                throw new Error('The task deletion response did not match the selected task.');
             }
 
-            return;
-        }
+            const deletedTask = taskRow;
+            const deletedStatus = deletedTask.dataset.taskStatus;
+            const restoreUrl = typeof payload.restore_url === 'string'
+                ? new URL(payload.restore_url, window.location.origin)
+                : null;
+            const removed = removeDeletedTask(deletedStatus);
 
-        if (!response.ok || String(payload.task_id) !== taskRow.dataset.taskId) {
-            showError(response.status === 403
+            if (removed) {
+                if (!restoreUrl || restoreUrl.origin !== window.location.origin) {
+                    console.error('The task deletion response did not contain a valid restore URL.');
+                    showToast('info', 'Task moved to trash');
+
+                    return;
+                }
+
+                showToast({
+                    type: 'success',
+                    title: 'Task moved to trash',
+                    message: 'You can undo this deletion.',
+                    actionLabel: 'Undo',
+                    duration: UNDO_SECONDS * 1000,
+                    onAction: async () => {
+                        const { data: restored } = await request(restoreUrl.href, { method: 'POST' });
+                        const markup = document.createElement('template');
+                        markup.innerHTML = typeof restored.html === 'string' ? restored.html : '';
+                        const restoredRow = markup.content.firstElementChild;
+
+                        if (
+                            String(restored.task_id) !== deletedTask.dataset.taskId
+                            || !restored.task
+                            || typeof restored.task.title !== 'string'
+                            || typeof restored.task.status !== 'string'
+                            || !restoredRow?.matches('[data-task-row]')
+                            || markup.content.childElementCount !== 1
+                        ) {
+                            throw new Error('The task restore response was invalid.');
+                        }
+
+                        const taskList = document.getElementById('task-list');
+
+                        if (taskList) {
+                            taskList.prepend(restoredRow);
+                            taskList.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
+                            updateDashboardTaskStats(null, restored.task.status, 1);
+                        }
+
+                        showToast('success', 'Task restored', restored.task.title);
+                    },
+                });
+            }
+        } catch (error) {
+            if (error.status === 404) {
+                if (removeDeletedTask(taskRow.dataset.taskStatus)) {
+                    showToast('info', 'Task already deleted', 'Removed it from your list.');
+                }
+
+                return;
+            }
+
+            console.error('Task deletion request failed.', error);
+            showError(error.status === 403
                 ? "You don't have permission to delete this task."
                 : "Couldn't delete the task. Please try again.");
             setSubmitting(false);
-
-            return;
         }
-
-        removeDeletedTask(deletedStatus);
     });
 };
 

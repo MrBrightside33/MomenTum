@@ -75,4 +75,5 @@ const initializeTeam = () => {
     updateTeam();
 };
 
+document.addEventListener('page:load', initializeTeam);
 initializeTeam();

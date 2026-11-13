@@ -2,31 +2,37 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\ProjectStatus;
-use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\Project;
-use App\Models\Task;
-use App\Models\User;
+use App\Support\Metrics\ProjectMetrics;
+use App\Support\Metrics\TaskMetrics;
+use App\Support\Metrics\UserMetrics;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
 
 class OverviewController extends Controller
 {
     public function __invoke(): View
     {
-        $userCounts = collect(['active', 'pending', 'inactive'])
-            ->mapWithKeys(fn (string $status): array => [
-                $status => User::query()->accountStatus($status)->count(),
-            ]);
-        $taskCounts = collect(TaskStatus::cases())
-            ->mapWithKeys(fn (TaskStatus $status): array => [
-                $status->value => Task::query()->where('status', $status->value)->count(),
-            ]);
-        $projectCounts = collect(ProjectStatus::cases())
-            ->mapWithKeys(fn (ProjectStatus $status): array => [
-                $status->value => Project::query()->effectiveStatus($status)->count(),
-            ]);
+        return view('admin.overview');
+    }
+
+    public function data(
+        Request $request,
+        UserMetrics $userMetrics,
+        TaskMetrics $taskMetrics,
+        ProjectMetrics $projectMetrics,
+    ): View {
+        $timezone = $request->user()->settings['timezone'] ?? config('app.timezone');
+
+        if (! in_array($timezone, array_keys(config('settings.timezones', [])), true)) {
+            $timezone = config('app.timezone');
+        }
+
+        $localNow = now($timezone);
+        $userCounts = $userMetrics->counts();
+        $taskCounts = $taskMetrics->counts(['today' => $localNow->toDateString()]);
+        $projectCounts = $projectMetrics->counts();
         $recentActivity = AuditLog::query()
             ->with('actor:id,name')
             ->latest('created_at')
@@ -34,10 +40,15 @@ class OverviewController extends Controller
             ->limit(8)
             ->get(['id', 'user_id', 'action', 'description', 'created_at']);
 
-        return view('admin.overview', [
+        return view('admin.partials.overview-data', [
             'userCounts' => $userCounts,
             'taskCounts' => $taskCounts,
             'projectCounts' => $projectCounts,
+            'adminMemberCount' => $userCounts['members'],
+            'failedSignInCount' => AuditLog::query()
+                ->where('action', 'auth.login_failed')
+                ->where('created_at', '>=', $localNow->copy()->subDay()->utc())
+                ->count(),
             'recentActivity' => $recentActivity,
         ]);
     }

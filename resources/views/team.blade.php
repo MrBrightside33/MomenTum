@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Team · MomenTum')
+@section('skeleton', 'team')
 
 @section('content')
     <div data-team-root class="space-y-6">
@@ -11,7 +12,7 @@
                 <p class="mt-2 text-slate-500">See who's on your team and how work is distributed.</p>
             </div>
             <a
-                href="{{ route('projects') }}"
+                href="{{ route('projects.index') }}"
                 class="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 sm:self-auto"
             >
                 <x-icon name="folder" class="size-4 text-indigo-600" />

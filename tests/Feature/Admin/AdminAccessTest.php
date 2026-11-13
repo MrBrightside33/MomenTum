@@ -23,6 +23,12 @@ class AdminAccessTest extends TestCase
         $this->actingAs($member)
             ->get(route('admin.overview'))
             ->assertForbidden();
+
+        $this->get(route('admin.overview.data'))
+            ->assertForbidden();
+
+        $this->get(route('admin.reports.data'))
+            ->assertForbidden();
     }
 
     public function test_inactive_admins_receive_a_json_forbidden_response(): void
@@ -43,8 +49,12 @@ class AdminAccessTest extends TestCase
             ->get(route('admin.overview'))
             ->assertOk()
             ->assertSeeText('Admin overview')
-            ->assertSeeText('Workspace members')
+            ->assertSee('id="admin-overview-data"', false)
             ->assertSee('aria-label="Administration navigation"', false);
+
+        $this->get(route('admin.overview.data'))
+            ->assertOk()
+            ->assertSeeText('Workspace members');
 
         $this->get(route('dashboard'))
             ->assertRedirectToRoute('admin.overview');

@@ -1,4 +1,7 @@
 import { showToast } from './toast';
+import { request } from './http';
+
+let activeUserDetailsController;
 
 const initializeAdminNavigation = () => {
     const sidebar = document.querySelector('[data-admin-sidebar]');
@@ -57,6 +60,8 @@ const initializeAdminNavigation = () => {
 initializeAdminNavigation();
 
 const initializeAdminUserDetails = () => {
+    activeUserDetailsController?.abort();
+    activeUserDetailsController = new AbortController();
     const modal = document.getElementById('admin-user-details-modal');
     const status = modal?.querySelector('[data-user-details-status]');
     const content = modal?.querySelector('[data-user-details-content]');
@@ -110,16 +115,10 @@ const initializeAdminUserDetails = () => {
                 throw new Error('The user details URL is invalid.');
             }
 
-            const response = await fetch(detailsUrl, {
+            const { data: result } = await request(detailsUrl, {
                 headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
             });
 
-            if (!response.ok) {
-                throw new Error('The user details could not be loaded.');
-            }
-
-            const result = await response.json();
             const data = result?.data;
 
             if (
@@ -165,7 +164,8 @@ const initializeAdminUserDetails = () => {
             });
             console.error('Unable to load admin user details.', error);
         }
-    });
+    }, { signal: activeUserDetailsController.signal });
 };
 
+document.addEventListener('page:load', initializeAdminUserDetails);
 initializeAdminUserDetails();

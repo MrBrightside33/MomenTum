@@ -1,5 +1,6 @@
 import { showToast } from './toast';
 import { updateDashboardTaskStats } from './task-stats';
+import { request } from './http';
 
 const initializeTaskForm = () => {
     const form = document.getElementById('create-task-form');
@@ -11,8 +12,8 @@ const initializeTaskForm = () => {
     const successModal = document.getElementById('task-success-modal');
     const successViewTaskButton = successModal?.querySelector('[data-success-view-task]');
     const modal = document.getElementById('create-task-modal');
-    const taskList = document.getElementById('task-list');
-    const projectsRoot = document.querySelector('[data-projects-root]');
+    let taskList = document.getElementById('task-list');
+    let projectsRoot = document.querySelector('[data-projects-root]');
     const submitButton = document.getElementById('create-task-submit');
     const submitLabel = document.getElementById('create-task-submit-label');
     const modalTitle = document.getElementById('create-task-modal-title');
@@ -329,6 +330,20 @@ const initializeTaskForm = () => {
         }
     });
 
+    document.addEventListener('task:edit', (event) => {
+        const taskId = event.detail?.taskId;
+        const row = Array.from(document.querySelectorAll('[data-task-row]'))
+            .find((taskRow) => taskRow.dataset.taskId === String(taskId));
+
+        if (row) {
+            openEditForm(row);
+
+            return;
+        }
+
+        showToast('info', 'Task editing is available from the dashboard.', 'Open the task there to edit it.');
+    });
+
     // Let Escape dismiss the assignee list before the surrounding modal.
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !assigneePopover.hidden) {
@@ -574,6 +589,10 @@ const initializeTaskForm = () => {
     });
 
     modal.addEventListener('modal:close', resetForm);
+    document.addEventListener('page:load', () => {
+        taskList = document.getElementById('task-list');
+        projectsRoot = document.querySelector('[data-projects-root]');
+    });
 
     // Capture the initial defaults after hidden assignee inputs are in sync.
     syncAssignees();
@@ -616,106 +635,70 @@ const initializeTaskForm = () => {
 
         setSubmitting(true);
 
-        let response;
-
         try {
-            response = await fetch(form.action, {
+            const { data: payload } = await request(form.action, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: { 'X-CSRF-TOKEN': csrfToken },
                 body: new FormData(form),
             });
+
+            const rowMarkup = document.createElement('template');
+            rowMarkup.innerHTML = typeof payload.html === 'string' ? payload.html : '';
+            const returnedRow = rowMarkup.content.firstElementChild;
+
+            if (
+                !returnedRow?.matches('[data-task-row]')
+                || rowMarkup.content.childElementCount !== 1
+                || (isEditing && (!taskList || !rowToReplace?.isConnected))
+            ) {
+                console.error('The task save response did not contain a replaceable task row.');
+                showToast('error', failureMessage);
+                setSubmitting(false);
+
+                return;
+            }
+
+            form.dataset.skipDiscardConfirmation = 'true';
+            const modalClosed = window.Modal.close(modal.id);
+            delete form.dataset.skipDiscardConfirmation;
+
+            if (!modalClosed) {
+                console.error('The task modal could not close after a successful save.');
+                showToast('error', failureMessage);
+                setSubmitting(false);
+
+                return;
+            }
+
+            if (taskList) {
+                if (isEditing) {
+                    rowToReplace.replaceWith(returnedRow);
+                    returnedRow.querySelector('[data-edit-task]')?.focus();
+                } else {
+                    taskList.prepend(returnedRow);
+                }
+
+                taskList.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
+                returnedRow.classList.add('transition-colors', 'duration-1000', 'bg-indigo-50/60');
+                window.setTimeout(() => returnedRow.classList.remove('bg-indigo-50/60'), 2500);
+
+                updateDashboardTaskStats(previousStatus, taskStatus, isEditing ? 0 : 1);
+            }
+
+            if (isEditing) {
+                showToast('success', payload.message ?? 'Task updated', taskTitle);
+            } else {
+                showCreateSuccess(returnedRow);
+            }
         } catch (error) {
-            console.error('Task save request failed.', error);
-            showToast('error', failureMessage);
-            setSubmitting(false);
-
-            return;
-        }
-
-        if (response.status === 422) {
-            try {
-                const payload = await response.json();
-                showServerErrors(payload.errors ?? {});
-            } catch (error) {
-                console.error('Could not read task validation errors.', error);
+            if (error.status === 422) {
+                showServerErrors(error.data?.errors ?? {});
+            } else {
+                console.error('Task save request failed.', error);
                 showToast('error', failureMessage);
             }
 
             setSubmitting(false);
-
-            return;
-        }
-
-        if (!response.ok) {
-            showToast('error', failureMessage);
-            setSubmitting(false);
-
-            return;
-        }
-
-        let payload;
-
-        try {
-            payload = await response.json();
-        } catch (error) {
-            console.error('Could not read the task save response.', error);
-            showToast('error', failureMessage);
-            setSubmitting(false);
-
-            return;
-        }
-
-        const rowMarkup = document.createElement('template');
-        rowMarkup.innerHTML = typeof payload.html === 'string' ? payload.html : '';
-        const returnedRow = rowMarkup.content.firstElementChild;
-
-        if (
-            !returnedRow?.matches('[data-task-row]')
-            || rowMarkup.content.childElementCount !== 1
-            || (isEditing && (!taskList || !rowToReplace?.isConnected))
-        ) {
-            console.error('The task save response did not contain a replaceable task row.');
-            showToast('error', failureMessage);
-            setSubmitting(false);
-
-            return;
-        }
-
-        form.dataset.skipDiscardConfirmation = 'true';
-        const modalClosed = window.Modal.close(modal.id);
-        delete form.dataset.skipDiscardConfirmation;
-
-        if (!modalClosed) {
-            console.error('The task modal could not close after a successful save.');
-            showToast('error', failureMessage);
-            setSubmitting(false);
-
-            return;
-        }
-
-        if (taskList) {
-            if (isEditing) {
-                rowToReplace.replaceWith(returnedRow);
-                returnedRow.querySelector('[data-edit-task]')?.focus();
-            } else {
-                taskList.prepend(returnedRow);
-            }
-
-            taskList.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
-            returnedRow.classList.add('transition-colors', 'duration-1000', 'bg-indigo-50/60');
-            window.setTimeout(() => returnedRow.classList.remove('bg-indigo-50/60'), 2500);
-
-            updateDashboardTaskStats(previousStatus, taskStatus, isEditing ? 0 : 1);
-        }
-
-        if (isEditing) {
-            showToast('success', payload.message ?? 'Task updated', taskTitle);
-        } else {
-            showCreateSuccess(returnedRow);
         }
     });
 

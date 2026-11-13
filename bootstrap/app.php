@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ApplySimulatedLatency;
 use App\Http\Middleware\ApplyUserPreferences;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\TrackLastSeen;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             ApplyUserPreferences::class,
             TrackLastSeen::class,
+            ApplySimulatedLatency::class,
         ]);
         $middleware->alias([
             'admin' => EnsureAdmin::class,

@@ -39,6 +39,17 @@ class TaskPolicy
             && ($user->isManager() || $this->view($user, $task));
     }
 
+    public function updateProgress(User $user, Task $task): bool
+    {
+        return $user->is_active
+            && ! $user->isAdmin()
+            && (
+                $user->isManager()
+                || $task->created_by_id === $user->getKey()
+                || $task->assignees->contains(fn (User $assignee): bool => $assignee->is($user))
+            );
+    }
+
     public function addComment(User $user, Task $task): bool
     {
         return $user->is_active
@@ -53,7 +64,7 @@ class TaskPolicy
 
     public function restore(User $user, Task $task): bool
     {
-        return false;
+        return $task->trashed() && $this->ownsOrCreated($user, $task);
     }
 
     public function forceDelete(User $user, Task $task): bool

@@ -19,6 +19,9 @@
     data-task-due-date="{{ $task['due_date'] }}"
     data-task-assignees="{{ implode(',', $task['assignee_ids']) }}"
     data-task-status-url="{{ route('tasks.status.update', ['task' => $task['id']]) }}"
+    data-task-show-url="{{ $task['urls']['show'] }}"
+    data-task-project-url="{{ $task['urls']['project'] }}"
+    data-task='@json(["progress" => $task["progress"], "progress_label" => $task["progress_label"]])'
     class="flex items-center gap-4 border-b border-slate-100 px-5 py-4"
 >
     @if ($task['can_change_status'])
@@ -39,13 +42,16 @@
 
     <div class="min-w-0 flex-1 space-y-1">
         <div class="flex items-center gap-2">
-            <p class="truncate text-sm font-semibold {{ $task['done'] ? 'text-slate-400 line-through' : 'text-slate-800' }}">{{ $task['title'] }}</p>
+            <button type="button" data-task-details-open class="max-w-full truncate text-left text-sm font-semibold {{ $task['done'] ? 'text-slate-400 line-through' : 'text-slate-800' }} hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" aria-label="View details for {{ $task['title'] }}">{{ $task['title'] }}</button>
             <span class="rounded-full px-2.5 py-1 text-[11px] font-bold leading-none {{ $badge }}">{{ $task['priority'] }}</span>
         </div>
         <div class="flex items-center gap-2 text-xs text-slate-400">
             <span>{{ $task['category'] }}</span>
             <span>•</span>
-            <span data-task-due-label class="{{ $task['due_urgent'] ? 'font-semibold text-amber-600' : '' }}">{{ $task['due'] }}</span>
+            <span data-task-due-label class="{{ $task['due_overdue'] ? 'font-semibold text-red-600' : ($task['due_urgent'] ? 'font-semibold text-amber-600' : '') }}">{{ $task['due'] }}</span>
+            @if ($task['due_overdue'])
+                <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-600">Overdue</span>
+            @endif
         </div>
     </div>
 

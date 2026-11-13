@@ -28,6 +28,10 @@ return [
 
     'env' => env('APP_ENV', 'production'),
 
+    'simulate_latency' => filter_var(env('APP_SIMULATE_LATENCY', false), FILTER_VALIDATE_BOOLEAN),
+
+    'task_retention_days' => max(1, (int) env('TASK_RETENTION_DAYS', 30)),
+
     /*
     |--------------------------------------------------------------------------
     | Application Debug Mode

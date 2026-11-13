@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Support\AuditContext;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditContext $auditContext): RedirectResponse
     {
         $request->merge([
             'email' => Str::lower((string) $request->input('email')),
@@ -74,8 +75,8 @@ class AuthController extends Controller
             'password' => ['required', 'string', Password::min(8), 'confirmed'],
         ]);
 
-        $user = DB::transaction(function () use ($validated): User {
-            $user = User::create($validated);
+        $user = DB::transaction(function () use ($validated, $auditContext): User {
+            $user = $auditContext->runFor(User::class, fn (): User => User::create($validated));
             $user->ownedProjects()->create([
                 'name' => 'Personal',
                 'description' => 'Keep individual goals and focused work in one place.',

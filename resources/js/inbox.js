@@ -1,3 +1,5 @@
+import { request } from './http';
+
 const initializeInbox = () => {
     const inboxList = document.getElementById('inbox-list');
 
@@ -44,19 +46,13 @@ const initializeInbox = () => {
             throw new Error('Inbox request is missing its security token or endpoint.');
         }
 
-        const response = await fetch(url, {
+        const { data: result } = await request(url, {
             method: 'PATCH',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify(payload),
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            json: payload,
         });
-        const result = await response.json();
 
-        if (!response.ok || !result.counts) {
+        if (!result.counts) {
             throw new Error(result.message ?? 'The notification could not be updated.');
         }
 
@@ -277,4 +273,5 @@ const initializeInbox = () => {
     });
 };
 
+document.addEventListener('page:load', initializeInbox);
 initializeInbox();

@@ -99,6 +99,15 @@ class LoginTest extends TestCase
             'owner_id' => User::query()->where('email', 'taylor@example.com')->value('id'),
             'name' => 'Personal',
         ]);
+        $user = User::query()->where('email', 'taylor@example.com')->firstOrFail();
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'auth.registered',
+            'subject_id' => $user->getKey(),
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'user.created',
+            'subject_id' => $user->getKey(),
+        ]);
     }
 
     public function test_register_page_renders_sign_up_fields_and_login_link(): void

@@ -150,4 +150,5 @@ const initializeSettings = () => {
     });
 };
 
+document.addEventListener('page:load', initializeSettings);
 initializeSettings();

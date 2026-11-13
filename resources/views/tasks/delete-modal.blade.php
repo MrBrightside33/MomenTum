@@ -1,22 +1,23 @@
-<x-modal id="delete-task-modal" title="Delete task?" subtitle="This action can’t be undone." maxWidth="max-w-[560px]">
+<x-modal id="delete-task-modal" title="Move task to trash?" subtitle="You can restore it before the retention period ends." maxWidth="max-w-[560px]">
     {{-- Delete task confirmation --}}
     <form
         id="delete-task-form"
         action="{{ route('tasks.destroy', ['task' => '__task_id__']) }}"
         method="POST"
         data-delete-url-template="{{ route('tasks.destroy', ['task' => '__task_id__']) }}"
+        data-retention-days="{{ config('app.task_retention_days', 30) }}"
         class="flex flex-col gap-5"
     >
         @csrf
         <input type="hidden" name="_method" value="DELETE">
 
-        {{-- Permanent deletion warning --}}
+        {{-- Trash retention warning --}}
         <div class="flex items-start gap-3 rounded-xl bg-red-50 p-3.5 text-red-700">
             <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-red-100">
                 <x-icon name="trash" class="size-4" />
             </span>
             <p id="delete-task-warning" class="pt-0.5 text-sm leading-5">
-                This task and its activity history will be permanently deleted and removed for all assignees.
+                This task will move to trash and can be restored before it is permanently deleted.
             </p>
         </div>
 

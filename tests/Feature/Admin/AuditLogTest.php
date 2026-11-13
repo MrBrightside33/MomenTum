@@ -59,8 +59,14 @@ class AuditLogTest extends TestCase
 
     public function test_prune_command_deletes_only_rows_older_than_the_requested_retention_period(): void
     {
-        $oldEntry = AuditLog::factory()->create(['created_at' => now()->subDays(181)]);
-        $recentEntry = AuditLog::factory()->create(['created_at' => now()->subDays(30)]);
+        $oldEntry = AuditLog::factory()->create([
+            'created_at' => now()->subDays(181),
+            'user_id' => null,
+        ]);
+        $recentEntry = AuditLog::factory()->create([
+            'created_at' => now()->subDays(30),
+            'user_id' => null,
+        ]);
 
         $this->artisan('audit:prune', ['--days' => 180])
             ->assertSuccessful();

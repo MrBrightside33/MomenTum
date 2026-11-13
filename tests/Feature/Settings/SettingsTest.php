@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -68,6 +69,8 @@ class SettingsTest extends TestCase
             'job_title' => 'Product designer',
             'bio' => 'I make useful things.',
         ]);
+        $auditLog = AuditLog::query()->where('action', 'user.profile_updated')->firstOrFail();
+        $this->assertSame(['name', 'email', 'job_title', 'bio'], $auditLog->metadata['changed_fields']);
     }
 
     public function test_profile_changes_reject_an_email_owned_by_another_user(): void
@@ -203,6 +206,9 @@ class SettingsTest extends TestCase
         $response->assertRedirectToRoute('settings');
         $this->assertAuthenticatedAs($user);
         $this->assertTrue(Hash::check('another-strong-password', $user->fresh()->password));
+        $auditLog = AuditLog::query()->where('action', 'user.password_changed')->firstOrFail();
+        $this->assertSame(['password'], $auditLog->metadata['changed_fields']);
+        $this->assertStringNotContainsString('another-strong-password', $auditLog->description);
     }
 
     public function test_preference_changes_are_persisted_and_used_for_the_default_route(): void
@@ -231,6 +237,11 @@ class SettingsTest extends TestCase
         $this->assertSame('dark', $settings['appearance']);
         $this->assertFalse($settings['notifications']['task_status_updates']);
         $this->assertSame('calendar', $user->fresh()->defaultPageRoute());
+        $auditLog = AuditLog::query()->where('action', 'user.preferences_updated')->firstOrFail();
+        $this->assertContains('timezone', $auditLog->metadata['changed_fields']);
+        $this->assertContains('theme', $auditLog->metadata['changed_fields']);
+        $this->assertContains('default_task_view', $auditLog->metadata['changed_fields']);
+        $this->assertContains('notifications.task_status_updates', $auditLog->metadata['changed_fields']);
         $this->get(route('home'))->assertRedirectToRoute('calendar');
     }
 

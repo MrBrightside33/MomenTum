@@ -4,6 +4,7 @@ namespace Tests\Feature\Projects;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -43,7 +44,7 @@ class ProjectsTest extends TestCase
         ]);
 
         $response = $this->actingAs($owner)
-            ->get(route('projects'))
+            ->get(route('projects.index'))
             ->assertOk();
 
         $this->assertSame(1, substr_count($response->getContent(), 'data-project-card'));
@@ -56,7 +57,7 @@ class ProjectsTest extends TestCase
             ->assertDontSee('A normal priority task')
             ->assertSee('data-project-filter="in_progress"', false)
             ->assertSee('data-project-search', false)
-            ->assertSee(route('dashboard').'#task-row-'.$task->getKey(), false)
+            ->assertSee(route('projects.show', ['task' => $task->getKey()]), false)
             ->assertSee('New project');
     }
 
@@ -69,7 +70,7 @@ class ProjectsTest extends TestCase
                 'name' => 'Release planning',
                 'description' => 'Coordinate the upcoming release.',
             ])
-            ->assertRedirect(route('projects'))
+            ->assertRedirect(route('projects.index'))
             ->assertSessionHas('status', 'Project created');
 
         $this->assertDatabaseHas('projects', [
@@ -77,6 +78,13 @@ class ProjectsTest extends TestCase
             'name' => 'Release planning',
             'description' => 'Coordinate the upcoming release.',
         ]);
+        $this->assertSame(
+            1,
+            AuditLog::query()
+                ->where('action', 'project.created')
+                ->where('subject_id', Project::query()->where('name', 'Release planning')->value('id'))
+                ->count(),
+        );
     }
 
     public function test_projects_page_includes_a_project_where_the_user_created_a_task(): void
@@ -93,11 +101,11 @@ class ProjectsTest extends TestCase
         ]);
 
         $this->actingAs($creator)
-            ->get(route('projects'))
+            ->get(route('projects.index'))
             ->assertOk()
             ->assertSee('Shared research')
             ->assertSee('Document findings')
-            ->assertSee(route('dashboard').'#task-row-'.$task->getKey(), false);
+            ->assertSee(route('projects.show', ['task' => $task->getKey()]), false);
     }
 
     public function test_new_high_priority_task_is_reflected_as_a_project_card(): void
@@ -122,7 +130,7 @@ class ProjectsTest extends TestCase
             ->firstOrFail();
 
         $this->actingAs($owner)
-            ->get(route('projects'))
+            ->get(route('projects.index'))
             ->assertOk()
             ->assertSee('id="create-task-form"', false)
             ->assertSee('Review production readiness')
@@ -154,7 +162,7 @@ class ProjectsTest extends TestCase
         $teamTask->assignees()->attach($user);
 
         $this->actingAs($user)
-            ->get(route('projects'))
+            ->get(route('projects.index'))
             ->assertOk()
             ->assertSee('Personal work')
             ->assertSee('Team launch')
@@ -168,10 +176,9 @@ class ProjectsTest extends TestCase
             ->assertSee('data-project-task-id="'.$personalTask->getKey().'"', false)
             ->assertSee('data-project-task-id="'.$secondPersonalTask->getKey().'"', false)
             ->assertSee('data-project-task-id="'.$teamTask->getKey().'"', false)
-            ->assertSee('aria-valuenow="0"', false)
-            ->assertSee('aria-valuenow="50"', false)
+            ->assertSee('aria-valuenow="13"', false)
             ->assertSee('aria-valuenow="100"', false)
-            ->assertSee(route('dashboard').'#task-row-'.$personalTask->getKey(), false)
-            ->assertSee(route('dashboard').'#task-row-'.$teamTask->getKey(), false);
+            ->assertSee(route('projects.show', ['task' => $personalTask->getKey()]), false)
+            ->assertSee(route('projects.show', ['task' => $teamTask->getKey()]), false);
     }
 }

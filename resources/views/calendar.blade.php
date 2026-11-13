@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Calendar · MomenTum')
+@section('skeleton', 'calendar')
 
 @section('content')
     <div

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\TaskActivity;
+use App\Support\Metrics\TaskMetrics;
 use App\Support\TaskPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, TaskPresenter $presenter): View|RedirectResponse
+    public function __invoke(Request $request, TaskPresenter $presenter, TaskMetrics $metrics): View|RedirectResponse
     {
         $user = $request->user();
 
@@ -27,25 +28,36 @@ class DashboardController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $totalTasks = $tasks->count();
-        $inProgressTasks = $tasks->where('status', TaskStatus::InProgress)->count();
-        $completedTasks = $tasks->where('status', TaskStatus::Completed)->count();
-        $completedThisWeek = TaskActivity::query()
-            ->where('user_id', $user->getKey())
-            ->where('to_status', TaskStatus::Completed->value)
-            ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
-            ->count();
+        $timezone = $user->settings['timezone'] ?? config('app.timezone');
 
-        $weekStart = now()->startOfWeek();
+        if (! in_array($timezone, array_keys(config('settings.timezones', [])), true)) {
+            $timezone = config('app.timezone');
+        }
+
+        $localNow = now($timezone);
+        $taskCounts = $metrics->counts([
+            'user_id' => $user->getKey(),
+            'today' => $localNow->toDateString(),
+        ]);
+        $weekStart = $localNow->copy()->startOfWeek();
+        $weekEnd = $weekStart->copy()->endOfWeek();
+        $completedThisWeek = $metrics->completedActivity([
+            'user_id' => $user->getKey(),
+            'from' => $weekStart->copy()->utc()->toDateTimeString(),
+            'to' => $weekEnd->copy()->utc()->toDateTimeString(),
+        ])['completed'];
         $weekActivities = TaskActivity::query()
             ->where('user_id', $user->getKey())
             ->where('to_status', TaskStatus::Completed->value)
-            ->whereBetween('created_at', [$weekStart, $weekStart->copy()->endOfWeek()])
+            ->whereBetween('created_at', [
+                $weekStart->copy()->utc(),
+                $weekEnd->copy()->utc(),
+            ])
             ->get(['created_at'])
-            ->groupBy(fn (TaskActivity $activity): string => $activity->created_at->toDateString());
+            ->groupBy(fn (TaskActivity $activity): string => $activity->created_at->setTimezone($timezone)->toDateString());
         $maximumDailyCount = max(1, $weekActivities->map->count()->max() ?? 0);
 
-        $week = collect(range(0, 6))->map(function (int $offset) use ($weekStart, $weekActivities, $maximumDailyCount): array {
+        $week = collect(range(0, 6))->map(function (int $offset) use ($weekStart, $weekActivities, $maximumDailyCount, $localNow): array {
             $date = $weekStart->copy()->addDays($offset);
             $count = $weekActivities->get($date->toDateString(), collect())->count();
 
@@ -53,21 +65,23 @@ class DashboardController extends Controller
                 'day' => mb_substr($date->format('D'), 0, 1),
                 'value' => $count === 0 ? 8 : max(8, (int) round(($count / $maximumDailyCount) * 100)),
                 'count' => $count,
-                'highlight' => $date->isToday(),
+                'highlight' => $date->isSameDay($localNow),
             ];
         });
 
+        $localMonthStart = $localNow->copy()->subDays(30)->startOfDay();
         $activityDates = TaskActivity::query()
             ->where('user_id', $user->getKey())
             ->where('to_status', TaskStatus::Completed->value)
-            ->whereBetween('created_at', [today()->subDays(30), now()])
+            ->whereBetween('created_at', [$localMonthStart->copy()->utc(), $localNow->copy()->utc()])
             ->get(['created_at'])
-            ->map(fn (TaskActivity $activity): string => $activity->created_at->toDateString())
+            ->map(fn (TaskActivity $activity): string => $activity->created_at->setTimezone($timezone)->toDateString())
             ->unique()
             ->flip();
-        $streakCursor = $activityDates->has(today()->toDateString())
-            ? today()
-            : today()->subDay();
+        $today = $localNow->copy()->startOfDay();
+        $streakCursor = $activityDates->has($today->toDateString())
+            ? $today
+            : $today->copy()->subDay();
         $streakDays = 0;
 
         while ($streakCursor !== null && $activityDates->has($streakCursor->toDateString())) {
@@ -79,8 +93,8 @@ class DashboardController extends Controller
             [
                 'key' => 'total',
                 'label' => 'Total tasks',
-                'value' => $totalTasks,
-                'note' => $tasks->where('status', TaskStatus::Open)->count().' open',
+                'value' => $taskCounts['total'],
+                'note' => $taskCounts['open'].' open',
                 'icon' => 'list',
                 'bg' => 'bg-indigo-50',
                 'fg' => 'text-indigo-600',
@@ -88,8 +102,8 @@ class DashboardController extends Controller
             [
                 'key' => 'in_progress',
                 'label' => 'In progress',
-                'value' => $inProgressTasks,
-                'note' => $tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Completed && $task->due_date->isToday())->count().' due today',
+                'value' => $taskCounts['in_progress'],
+                'note' => $taskCounts['due_today'].' due today',
                 'icon' => 'clock',
                 'bg' => 'bg-amber-50',
                 'fg' => 'text-amber-600',
@@ -97,8 +111,8 @@ class DashboardController extends Controller
             [
                 'key' => 'completed',
                 'label' => 'Completed',
-                'value' => $completedTasks,
-                'note' => $completedTasks.' completed',
+                'value' => $taskCounts['completed'],
+                'note' => $taskCounts['completed'].' completed',
                 'icon' => 'check',
                 'bg' => 'bg-emerald-50',
                 'fg' => 'text-emerald-600',
@@ -106,8 +120,8 @@ class DashboardController extends Controller
             [
                 'key' => 'productivity',
                 'label' => 'Productivity',
-                'value' => ($totalTasks === 0 ? 0 : (int) round(($completedTasks / $totalTasks) * 100)).'%',
-                'note' => $completedTasks.' of '.$totalTasks.' tasks completed',
+                'value' => $taskCounts['completion_rate'].'%',
+                'note' => $taskCounts['completed'].' of '.$taskCounts['total'].' tasks completed',
                 'icon' => 'chart-line',
                 'bg' => 'bg-violet-50',
                 'fg' => 'text-violet-600',
@@ -119,7 +133,7 @@ class DashboardController extends Controller
             'stats' => $stats,
             'tasks' => $tasks->map(fn (Task $task): array => $presenter->present($task, $user)),
             'week' => $week,
-            'weekTitle' => $weekStart->format('M j').' – '.$weekStart->copy()->endOfWeek()->format('M j'),
+            'weekTitle' => $weekStart->format('M j').' – '.$weekEnd->format('M j'),
             'completedThisWeek' => $completedThisWeek,
             'streakDays' => $streakDays,
             'streakProgress' => min(100, (int) round(($streakDays / 7) * 100)),

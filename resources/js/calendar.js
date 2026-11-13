@@ -1,3 +1,5 @@
+import { request } from './http';
+
 const initializeCalendar = () => {
     const root = document.querySelector('[data-calendar-root]');
 
@@ -525,17 +527,11 @@ const initializeCalendar = () => {
             deleteScheduleButton.disabled = true;
 
             try {
-                const response = await fetch(deleteUrl, {
+                const { data: result } = await request(deleteUrl, {
                     method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
                 });
-                const result = await response.json();
 
-                if (!response.ok || String(result.id) !== scheduleId) {
+                if (String(result.id) !== scheduleId) {
                     announce(result.message ?? 'Schedule could not be removed. Please try again.');
                     return;
                 }
@@ -607,21 +603,10 @@ const initializeCalendar = () => {
         scheduleSubmitButton.disabled = true;
 
         try {
-            const response = await fetch(scheduleForm.action, {
+            const { data: result } = await request(scheduleForm.action, {
                 method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
                 body: formData,
             });
-            const result = await response.json();
-
-            if (!response.ok) {
-                const validationMessage = Object.values(result.errors ?? {}).flat()[0];
-                announce(validationMessage ?? result.message ?? 'Schedule could not be saved. Please try again.');
-                return;
-            }
 
             if (!isValidSchedule(result.event) || schedules.some((schedule) => schedule.id === result.event.id)) {
                 console.error('The calendar schedule response was invalid.');
@@ -641,7 +626,8 @@ const initializeCalendar = () => {
             renderCalendar();
         } catch (error) {
             console.error('Calendar schedule request failed.', error);
-            announce('Schedule could not be saved. Please try again.');
+            const validationMessage = Object.values(error.data?.errors ?? {}).flat()[0];
+            announce(validationMessage ?? error.data?.message ?? 'Schedule could not be saved. Please try again.');
         } finally {
             scheduleSubmitButton.disabled = false;
         }
@@ -672,4 +658,5 @@ const initializeCalendar = () => {
     });
 };
 
+document.addEventListener('page:load', initializeCalendar);
 initializeCalendar();

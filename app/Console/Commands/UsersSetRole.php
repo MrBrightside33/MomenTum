@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Enums\UserRole;
 use App\Models\User;
-use App\Services\AuditLogger;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -15,7 +14,7 @@ use Illuminate\Support\Str;
 #[Description('Change a user role while protecting the last active administrator')]
 class UsersSetRole extends Command
 {
-    public function handle(AuditLogger $auditLogger): int
+    public function handle(): int
     {
         $email = Str::lower((string) $this->argument('email'));
         $role = UserRole::tryFrom(Str::lower((string) $this->argument('role')));
@@ -34,7 +33,7 @@ class UsersSetRole extends Command
             return self::FAILURE;
         }
 
-        $result = DB::transaction(function () use ($auditLogger, $role, $user): array {
+        $result = DB::transaction(function () use ($role, $user): array {
             // Lock active administrators before checking the last-admin safeguard.
             $activeAdmins = User::query()
                 ->where('role', UserRole::Admin)
@@ -58,13 +57,6 @@ class UsersSetRole extends Command
             }
 
             $lockedUser->forceFill(['role' => $role])->save();
-            $auditLogger->record(
-                'user.role_changed',
-                $lockedUser,
-                'A user role was changed by the console command.',
-                ['old_role' => $previousRole->value, 'new_role' => $role->value],
-                null,
-            );
 
             return ['status' => 'changed', 'previous_role' => $previousRole];
         });

@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Metrics\ProjectMetrics;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, ProjectMetrics $projectMetrics): View
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -40,14 +40,6 @@ class SearchController extends Controller
             ->get(['id', 'project_id', 'created_by_id', 'title', 'status', 'created_at']);
         $projects = $search === '' ? collect() : Project::query()
             ->with('owner:id,name')
-            ->withCount([
-                'tasks',
-                'tasks as incomplete_tasks_count' => fn (Builder $query): Builder => $query->where(
-                    'status',
-                    '!=',
-                    TaskStatus::Completed->value,
-                ),
-            ])
             ->where(function (Builder $query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
@@ -55,10 +47,17 @@ class SearchController extends Controller
             ->orderBy('name')
             ->limit(5)
             ->get(['id', 'owner_id', 'name', 'status']);
-        $projects->each(function (Project $project): void {
+        $summaries = $projectMetrics->summaries(['project_ids' => $projects->modelKeys()]);
+        $projects->each(function (Project $project) use ($summaries): void {
+            $summary = $summaries[$project->getKey()] ?? [
+                'tasks' => 0,
+                'incomplete_tasks' => 0,
+                'completed_tasks' => 0,
+                'progress' => 0,
+            ];
             $project->setAttribute(
                 'effective_status',
-                $project->effectiveStatusFromCounts($project->tasks_count, $project->incomplete_tasks_count)->value,
+                $project->effectiveStatusFromCounts($summary['tasks'], $summary['incomplete_tasks'])->value,
             );
         });
 

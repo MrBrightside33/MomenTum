@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Overview · MomenTum')
+@section('skeleton', 'dashboard')
 
 @section('content')
 
@@ -127,5 +128,7 @@
             <div data-streak-progress class="h-full rounded-full bg-white" style="width: {{ $streakProgress }}%"></div>
         </div>
     </section>
+
+    @include('tasks._details-modal')
 
 @endsection

@@ -15,21 +15,22 @@
 
     <nav class="flex-1 overflow-y-auto px-3 py-5">
         <p class="truncate px-3 pb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Administration</p>
-        <div class="space-y-1">
+        <div class="space-y-1" data-soft-swap="admin-sidebar-nav">
             @php
                 $adminLinks = [
-                    ['label' => 'Admin overview', 'icon' => 'layout-grid', 'route' => 'admin.overview', 'active' => request()->routeIs('admin.overview')],
-                    ['label' => 'Users & roles', 'icon' => 'shield-check', 'route' => 'admin.users.index', 'active' => request()->routeIs('admin.users.*'), 'count' => $adminMemberCount],
-                    ['label' => 'All tasks', 'icon' => 'list', 'route' => 'admin.tasks.index', 'active' => request()->routeIs('admin.tasks.*')],
-                    ['label' => 'Projects', 'icon' => 'folder', 'route' => 'admin.projects.index', 'active' => request()->routeIs('admin.projects.*')],
-                    ['label' => 'Reports', 'icon' => 'chart-line', 'route' => 'admin.reports.index', 'active' => request()->routeIs('admin.reports.*')],
-                    ['label' => 'Audit log', 'icon' => 'clock', 'route' => 'admin.audit.index', 'active' => request()->routeIs('admin.audit.*')],
+                    ['label' => 'Admin overview', 'icon' => 'layout-grid', 'route' => 'admin.overview', 'active' => request()->routeIs('admin.overview'), 'skeleton' => 'admin-overview'],
+                    ['label' => 'Users & roles', 'icon' => 'shield-check', 'route' => 'admin.users.index', 'active' => request()->routeIs('admin.users.*'), 'count' => $adminMemberCount, 'skeleton' => 'admin-users'],
+                    ['label' => 'All tasks', 'icon' => 'list', 'route' => 'admin.tasks.index', 'active' => request()->routeIs('admin.tasks.*'), 'skeleton' => 'admin-tasks'],
+                    ['label' => 'Projects', 'icon' => 'folder', 'route' => 'admin.projects.index', 'active' => request()->routeIs('admin.projects.*'), 'skeleton' => 'admin-projects'],
+                    ['label' => 'Reports', 'icon' => 'chart-line', 'route' => 'admin.reports.index', 'active' => request()->routeIs('admin.reports.*'), 'skeleton' => 'admin-reports'],
+                    ['label' => 'Audit log', 'icon' => 'clock', 'route' => 'admin.audit.index', 'active' => request()->routeIs('admin.audit.*'), 'skeleton' => 'admin-audit'],
                 ];
             @endphp
 
             @foreach ($adminLinks as $link)
                 <a
                     href="{{ route($link['route']) }}"
+                    data-skeleton="{{ $link['skeleton'] }}"
                     @if ($link['active']) aria-current="page" @endif
                     class="flex h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-base transition {{ $link['active'] ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}"
                 >
@@ -45,6 +46,7 @@
         <p class="px-3 pb-3 pt-8 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Account</p>
         <a
             href="{{ route('admin.settings.index') }}"
+            data-skeleton="settings"
             @if (request()->routeIs('admin.settings.*')) aria-current="page" @endif
             class="flex h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-base transition {{ request()->routeIs('admin.settings.*') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}"
         >

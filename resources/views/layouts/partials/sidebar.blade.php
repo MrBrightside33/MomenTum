@@ -1,10 +1,10 @@
 @php
     $workspace = [
-        ['label' => 'Overview', 'icon' => 'layout-grid', 'href' => route('dashboard'), 'active' => request()->routeIs('dashboard')],
-        ['label' => 'Inbox',    'icon' => 'inbox',       'href' => route('inbox'), 'active' => request()->routeIs('inbox')],
-        ['label' => 'Calendar', 'icon' => 'calendar',    'href' => route('calendar'), 'active' => request()->routeIs('calendar')],
-        ['label' => 'Projects', 'icon' => 'folder',      'href' => route('projects'), 'active' => request()->routeIs('projects')],
-        ['label' => 'Team',     'icon' => 'users',       'href' => route('team'), 'active' => request()->routeIs('team')],
+        ['label' => 'Overview', 'icon' => 'layout-grid', 'href' => route('dashboard'), 'active' => request()->routeIs('dashboard'), 'skeleton' => 'dashboard'],
+        ['label' => 'Inbox',    'icon' => 'inbox',       'href' => route('inbox'), 'active' => request()->routeIs('inbox'), 'skeleton' => 'inbox'],
+        ['label' => 'Calendar', 'icon' => 'calendar',    'href' => route('calendar'), 'active' => request()->routeIs('calendar'), 'skeleton' => 'calendar'],
+        ['label' => 'Projects', 'icon' => 'folder',      'href' => route('projects.index'), 'active' => request()->routeIs('projects.*'), 'skeleton' => 'projects'],
+        ['label' => 'Team',     'icon' => 'users',       'href' => route('team'), 'active' => request()->routeIs('team'), 'skeleton' => 'team'],
     ];
     $currentUser = auth()->user();
 @endphp
@@ -24,9 +24,9 @@
             {{ $currentUser?->settings['workspace_name'] ?? 'Workspace' }}
         </p>
 
-        <div class="space-y-1">
+        <div class="space-y-1" data-soft-swap="app-sidebar-nav">
             @foreach ($workspace as $item)
-                <a href="{{ $item['href'] }}"
+                <a href="{{ $item['href'] }}" data-skeleton="{{ $item['skeleton'] }}"
                    @if (!empty($item['active'])) aria-current="page" @endif
                    class="flex h-11 items-center gap-3 rounded-xl px-3 transition
                           {{ !empty($item['active']) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}">
@@ -40,7 +40,7 @@
         </div>
 
         <p class="px-3 pb-3 pt-8 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Account</p>
-        <a href="{{ route('settings') }}"
+        <a href="{{ route('settings') }}" data-skeleton="settings"
            @if (request()->routeIs('settings*')) aria-current="page" @endif
            class="flex h-11 items-center gap-3 rounded-xl px-3 transition
                   {{ request()->routeIs('settings*') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50' }}">

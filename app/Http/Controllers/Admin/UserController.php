@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\LastActive;
+use App\Support\Metrics\TaskMetrics;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, TaskMetrics $taskMetrics): View
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -40,7 +41,6 @@ class UserController extends Controller
                 'last_login_at',
                 'last_seen_at',
             ])
-            ->withCount(['assignedTasks', 'ownedProjects'])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query->where('name', 'like', "%{$search}%")
@@ -55,11 +55,15 @@ class UserController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $assignedCounts = $taskMetrics->assignedCounts($users->getCollection()->modelKeys());
         $users->getCollection()->each(function (User $user) use ($timezone): void {
             $user->setAttribute(
                 'last_active_label',
                 LastActive::label($user->last_seen_at, $user->last_login_at, $timezone),
             );
+        });
+        $users->getCollection()->each(function (User $user) use ($assignedCounts): void {
+            $user->setAttribute('assigned_tasks_count', $assignedCounts[$user->getKey()] ?? 0);
         });
 
         return view('admin.users.index', [
@@ -69,11 +73,12 @@ class UserController extends Controller
         ]);
     }
 
-    public function show(Request $request, User $user): JsonResponse
+    public function show(Request $request, User $user, TaskMetrics $taskMetrics): JsonResponse
     {
-        $user->loadCount(['assignedTasks', 'ownedProjects']);
         $timezone = $request->user()->settings['timezone'] ?? config('app.timezone');
         $role = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
+        $assignedTasks = $taskMetrics->assignedCounts([$user->getKey()])[$user->getKey()] ?? 0;
+        $ownedProjects = $user->ownedProjects()->count();
 
         return response()->json([
             'data' => [
@@ -85,8 +90,8 @@ class UserController extends Controller
                 'bio' => $user->bio,
                 'joined' => $user->created_at?->format('M j, Y'),
                 'last_active' => LastActive::label($user->last_seen_at, $user->last_login_at, $timezone),
-                'assigned_tasks' => $user->assigned_tasks_count,
-                'owned_projects' => $user->owned_projects_count,
+                'assigned_tasks' => $assignedTasks,
+                'owned_projects' => $ownedProjects,
             ],
         ]);
     }

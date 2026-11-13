@@ -1,6 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Audit log · MomenTum')
+@section('skeleton', 'admin-audit')
 
 @section('content')
     <div class="space-y-8">

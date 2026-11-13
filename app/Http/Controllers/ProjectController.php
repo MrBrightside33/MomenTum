@@ -9,21 +9,30 @@ use App\Http\Requests\StoreProjectRequest;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Support\Metrics\ProjectMetrics;
+use App\Support\Metrics\TaskMetrics;
 use App\Support\TaskPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class ProjectController extends Controller
 {
-    public function index(Request $request, TaskPresenter $presenter): View
-    {
+    public function index(
+        Request $request,
+        TaskPresenter $presenter,
+        TaskMetrics $taskMetrics,
+        ProjectMetrics $projectMetrics,
+    ): View {
         Gate::authorize('viewAny', Project::class);
         $user = $request->user();
+        $taskCounts = $taskMetrics->counts([
+            'user_id' => $user->getKey(),
+            'priority' => TaskPriority::High->value,
+        ]);
+        $projectProgress = $projectMetrics->progress(['user_id' => $user->getKey()]);
         $projects = Project::query()
             ->visibleTo($user)
             ->with([
@@ -33,7 +42,9 @@ class ProjectController extends Controller
                         ->with([
                             'assignees:id,name',
                             'creator:id,name',
-                            'project:id,name,owner_id',
+                            'progressUpdater:id,name',
+                            'activities.user:id,name',
+                            'comments.user:id,name',
                         ])
                         ->orderBy('due_date')
                         ->orderBy('id');
@@ -41,10 +52,11 @@ class ProjectController extends Controller
             ])
             ->orderBy('name')
             ->get()
-            ->flatMap(function (Project $project) use ($user, $presenter): array {
+            ->flatMap(function (Project $project) use ($user, $presenter, $projectProgress): array {
                 return $project->tasks
                     ->filter(fn (Task $task): bool => $task->priority === TaskPriority::High)
-                    ->map(function (Task $task) use ($project, $user, $presenter): array {
+                    ->map(function (Task $task) use ($project, $user, $presenter, $projectProgress): array {
+                        $task->setRelation('project', $project);
                         $presented = $presenter->present($task, $user);
                         $members = collect([$project->owner, $task->creator])
                             ->merge($task->assignees)
@@ -56,6 +68,7 @@ class ProjectController extends Controller
                                 'initials' => TaskPresenter::initials($member->name),
                             ])
                             ->values();
+
                         return [
                             'id' => $task->getKey(),
                             'name' => $task->title,
@@ -64,18 +77,15 @@ class ProjectController extends Controller
                                 TaskStatus::InProgress => ProjectStatus::InProgress->value,
                                 TaskStatus::Completed => ProjectStatus::Completed->value,
                             },
-                            'progress' => match ($task->status) {
-                                TaskStatus::Open => 0,
-                                TaskStatus::InProgress => 50,
-                                TaskStatus::Completed => 100,
-                            },
+                            'progress' => $projectProgress[$project->getKey()] ?? 0,
                             'completed_task_count' => $task->status === TaskStatus::Completed ? 1 : 0,
                             'task_count' => 1,
                             'collaboration' => $members->count() > 1 ? 'Team project' : 'One-person project',
                             'members' => $members->all(),
                             'parent_project' => $project->name,
                             'due' => $presented['due'],
-                            'task_url' => route('dashboard').'#task-row-'.$task->getKey(),
+                            'task_url' => route('projects.show', ['task' => $task->getKey()]),
+                            'task' => $presented,
                             'search' => trim($task->title.' '.$task->description.' '.$project->name.' '.$members->pluck('name')->implode(' ')),
                         ];
                     })
@@ -85,13 +95,13 @@ class ProjectController extends Controller
             ->values();
 
         $projectCounts = [
-            'all' => $projects->count(),
-            'in_progress' => $projects->where('status', ProjectStatus::InProgress->value)->count(),
-            'completed' => $projects->where('status', ProjectStatus::Completed->value)->count(),
-            'planning' => $projects->where('status', ProjectStatus::Planning->value)->count(),
+            'all' => $taskCounts['total'],
+            'in_progress' => $taskCounts['in_progress'],
+            'completed' => $taskCounts['completed'],
+            'planning' => $taskCounts['statuses'][TaskStatus::Open->value],
         ];
-        $totalTasks = $projects->count();
-        $completedTasks = $projects->where('status', ProjectStatus::Completed->value)->count();
+        $totalTasks = $taskCounts['total'];
+        $completedTasks = $taskCounts['completed'];
         $projectStats = [
             ['label' => 'High-priority projects', 'value' => $projectCounts['all'], 'note' => 'One project per high-priority task', 'icon' => 'folder', 'bg' => 'bg-indigo-50', 'fg' => 'text-indigo-600'],
             ['label' => 'In progress', 'value' => $projectCounts['in_progress'], 'note' => 'High-priority projects underway', 'icon' => 'clock', 'bg' => 'bg-amber-50', 'fg' => 'text-amber-600'],
@@ -104,36 +114,58 @@ class ProjectController extends Controller
             'projectCounts' => $projectCounts,
             'projectStats' => $projectStats,
             'canCreateProjects' => $user->can('create', Project::class),
+            'openedTask' => null,
         ]);
     }
 
-    public function store(StoreProjectRequest $request, AuditLogger $auditLogger): RedirectResponse
-    {
-        DB::transaction(function () use ($auditLogger, $request): void {
-            $project = $request->user()->ownedProjects()->create($request->validated());
-            $auditLogger->record('project.created', $project, 'Project created: '.$project->name, [], $request->user());
-        });
+    public function show(
+        Request $request,
+        string $task,
+        TaskPresenter $presenter,
+        TaskMetrics $taskMetrics,
+        ProjectMetrics $projectMetrics,
+    ): View|RedirectResponse {
+        if (! ctype_digit($task)) {
+            return redirect()->route('projects.index')->with('status', "Project not found or you don't have access");
+        }
 
-        return redirect()->route('projects')->with('status', 'Project created');
+        $user = $request->user();
+        $taskModel = Task::query()
+            ->visibleTo($user)
+            ->with([
+                'project:id,name,owner_id',
+                'project.owner:id,name',
+                'assignees:id,name',
+                'creator:id,name',
+                'progressUpdater:id,name',
+                'activities.user:id,name',
+                'comments.user:id,name',
+            ])
+            ->find((int) $task);
+
+        if ($taskModel === null || ! $user->can('view', $taskModel)) {
+            return redirect()->route('projects.index')->with('status', "Project not found or you don't have access");
+        }
+
+        return $this->index($request, $presenter, $taskMetrics, $projectMetrics)
+            ->with('openedTask', $presenter->present($taskModel, $user));
     }
 
-    public function archive(Request $request, Project $project, AuditLogger $auditLogger): RedirectResponse
+    public function store(StoreProjectRequest $request): RedirectResponse
+    {
+        $request->user()->ownedProjects()->create($request->validated());
+
+        return redirect()->route('projects.index')->with('status', 'Project created');
+    }
+
+    public function archive(Request $request, Project $project): RedirectResponse
     {
         Gate::authorize('archive', $project);
 
         if ($project->status !== ProjectStatus::Archived) {
-            DB::transaction(function () use ($auditLogger, $project, $request): void {
-                $project->forceFill(['status' => ProjectStatus::Archived])->save();
-                $auditLogger->record(
-                    'project.archived',
-                    $project,
-                    'Project archived: '.$project->name,
-                    [],
-                    $request->user(),
-                );
-            });
+            $project->forceFill(['status' => ProjectStatus::Archived])->save();
         }
 
-        return redirect()->route('projects')->with('status', 'Project archived');
+        return redirect()->route('projects.index')->with('status', 'Project archived');
     }
 }

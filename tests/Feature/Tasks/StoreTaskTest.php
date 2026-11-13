@@ -24,11 +24,56 @@ class StoreTaskTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Create a new task')
-            ->assertSee('Delete task?')
+            ->assertSee('Move task to trash?')
             ->assertSee('Add Task Successfully')
             ->assertSee('data-modal-open="create-task-modal"', false)
             ->assertSee('id="task-list"', false)
             ->assertSee('No tasks yet.');
+    }
+
+    public function test_dashboard_marks_past_due_incomplete_tasks_as_overdue_but_not_completed_tasks(): void
+    {
+        $this->travelTo('2026-11-13 12:00:00');
+
+        $owner = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $completedTask = Task::factory()->for($project)->create([
+            'title' => 'Completed late task',
+            'status' => TaskStatus::Completed,
+            'due_date' => '2026-11-12',
+        ]);
+        $overdueTask = Task::factory()->for($project)->create([
+            'title' => 'Unfinished late task',
+            'status' => TaskStatus::Open,
+            'due_date' => '2026-11-12',
+        ]);
+        $dueTodayTask = Task::factory()->for($project)->create([
+            'title' => 'Task due today',
+            'status' => TaskStatus::Open,
+            'due_date' => '2026-11-13',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('dashboard'));
+
+        $response
+            ->assertOk()
+            ->assertSeeInOrder([
+                'id="task-row-'.$overdueTask->getKey().'"',
+                'Overdue',
+                'id="task-row-'.$completedTask->getKey().'"',
+                'id="task-row-'.$dueTodayTask->getKey().'"',
+            ]);
+
+        $html = $response->getContent();
+        $completedTaskRowStart = strpos($html, 'id="task-row-'.$completedTask->getKey().'"');
+        $dueTodayTaskRowStart = strpos($html, 'id="task-row-'.$dueTodayTask->getKey().'"', $completedTaskRowStart);
+
+        self::assertNotFalse($completedTaskRowStart);
+        self::assertNotFalse($dueTodayTaskRowStart);
+        self::assertStringNotContainsString(
+            'Overdue',
+            substr($html, $completedTaskRowStart, $dueTodayTaskRowStart - $completedTaskRowStart),
+        );
     }
 
     public function test_valid_task_input_persists_the_task_and_renders_escaped_task_data(): void

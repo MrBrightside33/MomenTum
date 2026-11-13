@@ -1,19 +1,22 @@
+let activeProjectsController;
+
 const initializeProjects = () => {
+    activeProjectsController?.abort();
+    activeProjectsController = new AbortController();
     const root = document.querySelector('[data-projects-root]');
 
     if (!root) {
         return;
     }
 
-    const projectCards = Array.from(root.querySelectorAll('[data-project-card]'));
-    const filterButtons = Array.from(root.querySelectorAll('[data-project-filter]'));
-    const searchInput = root.querySelector('[data-project-search]');
-    const emptyState = root.querySelector('[data-projects-empty]');
-    const resetButton = root.querySelector('[data-projects-reset]');
-    const resultCount = root.querySelector('[data-projects-result-count]');
-    let activeFilter = 'all';
+    let activeFilter = root.querySelector('[data-project-filter][aria-pressed="true"]')?.dataset.projectFilter ?? 'all';
 
     const updateProjects = () => {
+        const searchInput = root.querySelector('[data-project-search]');
+        const projectCards = Array.from(root.querySelectorAll('[data-project-card]'));
+        const filterButtons = Array.from(root.querySelectorAll('[data-project-filter]'));
+        const emptyState = root.querySelector('[data-projects-empty]');
+        const resultCount = root.querySelector('[data-projects-result-count]');
         const searchTerm = searchInput instanceof HTMLInputElement
             ? searchInput.value.trim().toLocaleLowerCase()
             : '';
@@ -52,42 +55,53 @@ const initializeProjects = () => {
         if (resultCount) {
             resultCount.textContent = `Showing ${visibleCount} ${visibleCount === 1 ? 'project' : 'projects'}.`;
         }
+
+        filterButtons.forEach((button) => {
+            const isActive = button.dataset.projectFilter === activeFilter;
+
+            button.setAttribute('aria-pressed', String(isActive));
+            button.classList.toggle('bg-white', isActive);
+            button.classList.toggle('text-slate-900', isActive);
+            button.classList.toggle('shadow-sm', isActive);
+            button.classList.toggle('text-slate-500', !isActive);
+        });
     };
 
-    filterButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            activeFilter = button.dataset.projectFilter ?? 'all';
-
-            filterButtons.forEach((filterButton) => {
-                const isActive = filterButton === button;
-
-                filterButton.setAttribute('aria-pressed', String(isActive));
-                filterButton.classList.toggle('bg-white', isActive);
-                filterButton.classList.toggle('text-slate-900', isActive);
-                filterButton.classList.toggle('shadow-sm', isActive);
-                filterButton.classList.toggle('text-slate-500', !isActive);
-            });
-
-            updateProjects();
-        });
-    });
-
-    searchInput?.addEventListener('input', updateProjects);
-    resetButton?.addEventListener('click', () => {
-        if (searchInput instanceof HTMLInputElement) {
-            searchInput.value = '';
+    root.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) {
+            return;
         }
 
-        const allProjectsButton = filterButtons.find((button) => button.dataset.projectFilter === 'all');
+        const filterButton = event.target.closest('[data-project-filter]');
 
-        if (allProjectsButton instanceof HTMLButtonElement) {
-            allProjectsButton.click();
-        } else {
+        if (filterButton) {
+            activeFilter = filterButton.dataset.projectFilter ?? 'all';
+            updateProjects();
+
+            return;
+        }
+
+        if (event.target.closest('[data-projects-reset]')) {
+            const searchInput = root.querySelector('[data-project-search]');
+
+            if (searchInput instanceof HTMLInputElement) {
+                searchInput.value = '';
+            }
+
+            activeFilter = 'all';
             updateProjects();
         }
     });
 
+    root.addEventListener('input', (event) => {
+        if (event.target instanceof HTMLInputElement && event.target.matches('[data-project-search]')) {
+            updateProjects();
+        }
+    });
+
+    document.addEventListener('regions:refreshed', initializeProjects, { signal: activeProjectsController.signal });
     updateProjects();
 };
 
+document.addEventListener('page:load', initializeProjects);
 initializeProjects();

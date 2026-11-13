@@ -10,7 +10,7 @@
         <x-icon name="menu" class="size-5" />
     </button>
 
-    <form method="GET" action="{{ route('admin.search') }}" class="relative w-full max-w-md">
+    <form method="GET" action="{{ route('admin.search') }}" data-skeleton="admin-search" data-soft-swap="admin-search" class="relative w-full max-w-md">
         <label for="admin-search" class="sr-only">Search users, tasks, or projects</label>
         <x-icon name="search" class="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
         <input
@@ -26,6 +26,8 @@
     <div class="ml-auto">
         <a
             href="{{ route('admin.audit.index', ['group' => 'security']) }}"
+            data-skeleton="admin-audit"
+            data-soft-swap="admin-security-link"
             aria-label="Security events"
             title="Security events"
             class="relative flex size-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"

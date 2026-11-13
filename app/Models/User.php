@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Observers\UserObserver;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -16,6 +18,7 @@ use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password', 'job_title', 'bio', 'avatar_path', 'settings'])]
 #[Hidden(['password', 'remember_token'])]
+#[ObservedBy([UserObserver::class])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -82,19 +85,38 @@ class User extends Authenticatable
     /** Active accounts have signed in; an active account with no login is still pending. */
     public function accountStatus(): string
     {
-        if (! $this->is_active) {
-            return 'inactive';
+        foreach (config('metrics.users.statuses', []) as $status => $definition) {
+            if ($this->is_active !== $definition['is_active']) {
+                continue;
+            }
+
+            $hasSignedIn = $this->last_login_at !== null;
+
+            if (
+                $definition['last_login'] === 'any'
+                || ($definition['last_login'] === 'required' && $hasSignedIn)
+                || ($definition['last_login'] === 'missing' && ! $hasSignedIn)
+            ) {
+                return $status;
+            }
         }
 
-        return $this->last_login_at === null ? 'pending' : 'active';
+        return 'inactive';
     }
 
     public function scopeAccountStatus(Builder $query, string $status): Builder
     {
-        return match ($status) {
-            'active' => $query->where('is_active', true)->whereNotNull('last_login_at'),
-            'pending' => $query->where('is_active', true)->whereNull('last_login_at'),
-            'inactive' => $query->where('is_active', false),
+        $definition = config("metrics.users.statuses.{$status}");
+
+        if (! is_array($definition)) {
+            return $query;
+        }
+
+        $query->where('is_active', $definition['is_active']);
+
+        return match ($definition['last_login']) {
+            'required' => $query->whereNotNull('last_login_at'),
+            'missing' => $query->whereNull('last_login_at'),
             default => $query,
         };
     }

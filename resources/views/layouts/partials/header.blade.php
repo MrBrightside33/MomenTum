@@ -10,6 +10,7 @@
         action="{{ route('dashboard') }}"
         role="search"
         class="relative w-full max-w-md"
+        data-skeleton="dashboard"
         data-task-search-form
         data-task-search-suggestions-url="{{ route('tasks.search-suggestions') }}"
     >
@@ -41,7 +42,7 @@
 
     {{-- Actions --}}
     <div class="ml-auto flex items-center gap-2">
-        <a href="{{ route('inbox') }}" class="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50" aria-label="Notifications">
+        <a href="{{ route('inbox') }}" data-skeleton="inbox" data-soft-swap="inbox-link" class="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50" aria-label="Notifications">
             <x-icon name="bell" class="size-5" />
             <span data-header-inbox-count aria-label="{{ $unreadInboxCount }} unread notifications" class="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white ring-2 ring-white {{ $unreadInboxCount === 0 ? 'hidden' : '' }}">{{ $unreadInboxCount }}</span>
         </a>

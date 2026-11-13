@@ -3,14 +3,16 @@
 namespace App\Models;
 
 use App\Enums\ProjectStatus;
-use App\Enums\TaskStatus;
+use App\Observers\ProjectObserver;
 use Database\Factories\ProjectFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy([ProjectObserver::class])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
@@ -55,7 +57,11 @@ class Project extends Model
 
     public function scopeEffectiveStatus(Builder $query, ProjectStatus $status): Builder
     {
-        $hasIncompleteTasks = fn (Builder $tasks): Builder => $tasks->where('status', '!=', TaskStatus::Completed->value);
+        $hasIncompleteTasks = fn (Builder $tasks): Builder => $tasks->where(
+            'status',
+            '!=',
+            config('metrics.tasks.completed_status'),
+        );
 
         return match ($status) {
             ProjectStatus::Archived => $query->where('status', ProjectStatus::Archived->value),

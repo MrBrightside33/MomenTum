@@ -1,3 +1,5 @@
+import { request } from './http';
+
 const initializeThemeToggle = () => {
     const form = document.querySelector('[data-theme-toggle-form]');
     const button = form?.querySelector('[data-theme-toggle]');
@@ -83,22 +85,10 @@ const initializeThemeToggle = () => {
         renderThemeControl();
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const response = await fetch(form.action, {
+            const { data: result } = await request(form.action, {
                 method: 'PUT',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken ?? '',
-                },
-                body: JSON.stringify({ appearance: nextAppearance }),
+                json: { appearance: nextAppearance },
             });
-
-            if (!response.ok) {
-                throw new Error('The appearance preference could not be saved.');
-            }
-
-            const result = await response.json();
 
             if (result.appearance !== nextAppearance) {
                 throw new Error('The server returned an unexpected appearance preference.');

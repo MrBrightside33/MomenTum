@@ -1,6 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Search results · MomenTum')
+@section('skeleton', 'admin-search')
 
 @section('content')
     <div class="space-y-8">

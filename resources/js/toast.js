@@ -17,7 +17,8 @@ export const showToast = (typeOrOptions, message, detail = '') => {
     const type = Object.hasOwn(iconPaths, options?.type) ? options.type : 'info';
     const title = options?.title ?? options?.message ?? '';
     const description = options?.title ? options.message : '';
-    const duration = Number.isFinite(options?.duration) ? options.duration : 4000;
+    const hasAction = typeof options?.actionLabel === 'string' && typeof options?.onAction === 'function';
+    const duration = Number.isFinite(options?.duration) ? options.duration : hasAction ? 6000 : 4000;
     let container = document.getElementById('toast-container');
 
     if (!container) {
@@ -62,6 +63,23 @@ export const showToast = (typeOrOptions, message, detail = '') => {
     }
 
     toast.append(iconCircle, textContainer);
+
+    if (hasAction) {
+        const actionButton = document.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'min-h-11 shrink-0 rounded-lg px-3 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
+        actionButton.textContent = options.actionLabel;
+        actionButton.addEventListener('click', () => {
+            actionButton.disabled = true;
+
+            Promise.resolve(options.onAction()).catch((error) => {
+                console.error('Toast action failed.', error);
+                showToast('error', 'The requested action could not be completed.');
+            });
+        });
+        toast.append(actionButton);
+    }
+
     container.append(toast);
 
     window.setTimeout(() => {

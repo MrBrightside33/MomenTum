@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Inbox · MomenTum')
+@section('skeleton', 'inbox')
 
 @section('content')
     <div class="space-y-6">

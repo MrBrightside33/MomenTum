@@ -1,3 +1,5 @@
+import { request } from './http';
+
 const initializeTaskSearch = () => {
     const form = document.querySelector('[data-task-search-form]');
     const input = form?.querySelector('#header-task-search');
@@ -116,20 +118,11 @@ const initializeTaskSearch = () => {
         url.searchParams.set('q', query);
 
         try {
-            const response = await fetch(url, {
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
+            const { data: payload } = await request(url, {
+                headers: { Accept: 'application/json' },
                 signal: requestController.signal,
+                key: 'task-search-suggestions',
             });
-
-            if (!response.ok) {
-                throw new Error(`Task suggestions returned HTTP ${response.status}.`);
-            }
-
-            const payload = await response.json();
 
             if (
                 requestController !== requestId
@@ -152,7 +145,7 @@ const initializeTaskSearch = () => {
             renderSuggestions(payload.data);
         } catch (error) {
             if (
-                error.name === 'AbortError'
+                error.code === 'aborted'
                 || requestController !== requestId
                 || input.value.trim() !== query
             ) {

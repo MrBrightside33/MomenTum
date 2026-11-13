@@ -34,15 +34,27 @@ class AdminReadOnlyPageTest extends TestCase
             ->get(route('admin.overview'))
             ->assertOk()
             ->assertSeeText('Admin overview')
+            ->assertSee('id="admin-overview-data"', false)
+            ->assertSee('id="sk-admin-overview-data"', false)
+            ->assertDontSee('id="sk-dashboard"', false)
+            ->assertDontSeeText('Quarterly planning activity recorded.');
+
+        $this->get(route('admin.overview.data'))
+            ->assertOk()
             ->assertSeeText('Quarterly planning activity recorded.');
 
         $this->get(route('admin.tasks.index'))
             ->assertOk()
             ->assertSeeText($task->title);
 
-        $this->get(route('admin.projects.index'))
+        $projectsResponse = $this->get(route('admin.projects.index'));
+        $projectsResponse
             ->assertOk()
-            ->assertSeeText($project->name);
+            ->assertSeeText($project->name)
+            ->assertDontSee('id="sk-dashboard"', false)
+            ->assertDontSee('id="sk-admin-overview-data"', false)
+            ->assertDontSee('id="sk-admin-reports"', false);
+        $this->assertLessThan(150_000, strlen((string) $projectsResponse->getContent()));
 
         $this->get(route('admin.projects.index', ['status' => 'in_progress']))
             ->assertOk()
@@ -50,6 +62,13 @@ class AdminReadOnlyPageTest extends TestCase
             ->assertSeeText('In progress');
 
         $this->get(route('admin.reports.index'))
+            ->assertOk()
+            ->assertSee('id="admin-reports-data"', false)
+            ->assertSee('id="sk-admin-reports"', false)
+            ->assertDontSee('id="sk-admin-overview-data"', false)
+            ->assertDontSeeText('Account status');
+
+        $this->get(route('admin.reports.data'))
             ->assertOk()
             ->assertSeeText('Account status');
 

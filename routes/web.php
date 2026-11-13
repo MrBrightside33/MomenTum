@@ -62,7 +62,8 @@ Route::post('/logout', [AuthController::class, 'logout'])
 
 Route::middleware(['auth', 'auth.session', EnsureActiveUser::class])->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    Route::get('/projects', [ProjectController::class, 'index'])->name('projects');
+    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::get('/projects/{task}', [ProjectController::class, 'show'])->name('projects.show');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::patch('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::get('/team', [TeamController::class, 'index'])->name('team');
@@ -86,20 +87,27 @@ Route::middleware(['auth', 'auth.session', EnsureActiveUser::class])->group(func
 
     Route::get('/tasks/search-suggestions', [TaskController::class, 'searchSuggestions'])
         ->name('tasks.search-suggestions');
+    Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    Route::patch('/tasks/{task}/progress', [TaskController::class, 'progress'])->name('tasks.progress');
     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.status.update');
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::post('/tasks/{task}/restore', [TaskController::class, 'restore'])
+        ->whereNumber('task')
+        ->name('tasks.restore');
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
 });
 
 Route::middleware(['auth', 'admin'])->group(function (): void {
     Route::get('/admin', AdminOverviewController::class)->name('admin.overview');
+    Route::get('/admin/overview/data', [AdminOverviewController::class, 'data'])->name('admin.overview.data');
     Route::get('/admin/users', [AdminUserController::class, 'index'])->name('admin.users.index');
     Route::get('/admin/users/{user}', [AdminUserController::class, 'show'])->name('admin.users.show');
     Route::get('/admin/tasks', [AdminTaskController::class, 'index'])->name('admin.tasks.index');
     Route::get('/admin/projects', [AdminProjectController::class, 'index'])->name('admin.projects.index');
     Route::get('/admin/reports', [AdminReportController::class, 'index'])->name('admin.reports.index');
+    Route::get('/admin/reports/data', [AdminReportController::class, 'data'])->name('admin.reports.data');
     Route::get('/admin/reports/export/{dataset}', [AdminReportExportController::class, 'download'])
         ->name('admin.reports.export');
     Route::get('/admin/audit-log', [AdminAuditLogController::class, 'index'])->name('admin.audit.index');

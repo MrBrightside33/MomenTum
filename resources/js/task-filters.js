@@ -92,4 +92,5 @@ const initializeDashboardTaskFilters = () => {
     updateTasks();
 };
 
+document.addEventListener('page:load', initializeDashboardTaskFilters);
 initializeDashboardTaskFilters();

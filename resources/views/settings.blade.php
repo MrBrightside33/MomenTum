@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Settings · MomenTum')
+@section('skeleton', 'settings')
 
 @section('content')
     <div data-settings-root class="space-y-6">

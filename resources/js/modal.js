@@ -121,7 +121,8 @@ document.addEventListener('keydown', (event) => {
 
     if (!overlay) {
         if (
-            event.key.toLowerCase() === 'n'
+            typeof event.key === 'string'
+            && event.key.toLowerCase() === 'n'
             && !event.altKey
             && !event.ctrlKey
             && !event.metaKey
@@ -167,4 +168,8 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-window.Modal = { open, close };
+window.Modal = {
+    open,
+    close,
+    top: () => getTopModal()?.id ?? null,
+};
