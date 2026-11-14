@@ -7,6 +7,47 @@
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+@layer base {
+    a[href],
+    button:enabled,
+    input:enabled:is(
+        [type='button'],
+        [type='checkbox'],
+        [type='color'],
+        [type='date'],
+        [type='datetime-local'],
+        [type='file'],
+        [type='image'],
+        [type='month'],
+        [type='radio'],
+        [type='range'],
+        [type='reset'],
+        [type='submit'],
+        [type='time'],
+        [type='week']
+    ),
+    label,
+    select:enabled,
+    summary,
+    [role='button']:not([aria-disabled='true']),
+    [role='checkbox']:not([aria-disabled='true']),
+    [role='link']:not([aria-disabled='true']),
+    [role='menuitem']:not([aria-disabled='true']),
+    [role='menuitemcheckbox']:not([aria-disabled='true']),
+    [role='menuitemradio']:not([aria-disabled='true']),
+    [role='option']:not([aria-disabled='true']),
+    [role='radio']:not([aria-disabled='true']),
+    [role='switch']:not([aria-disabled='true']),
+    [role='tab']:not([aria-disabled='true']),
+    [role='treeitem']:not([aria-disabled='true']) {
+        cursor: pointer;
+    }
+
+    input[type='file']::file-selector-button {
+        cursor: pointer;
+    }
+}
+
 :root[data-theme='dark'] {
     color-scheme: dark;
     --color-slate-50: #0b1220;

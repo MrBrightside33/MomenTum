@@ -1,8 +1,11 @@
 <?php
+
+use Illuminate\Contracts\Console\Kernel;
+
 require __DIR__.'/vendor/autoload.php';
 $app = require __DIR__.'/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$kernel = $app->make(Kernel::class);
+$app->make(Kernel::class)->bootstrap();
 
 $sampleTasks = fn (): array => [
     [
@@ -71,6 +74,7 @@ $allTasks = collect($sampleTasks());
 $teamMembers = collect(config('tasks.team'))->keyBy('id');
 $projectDescriptions = [
     'Personal' => 'Keep individual goals and focused work in one place.',
+    'Team' => 'Keep shared work, handoffs, and collaboration in one place.',
     'Product Design' => 'Research, plan, and refine thoughtful product experiences.',
     'Development' => 'Build and maintain reliable product experiences.',
     'Operations' => 'Keep team workflows and weekly planning on track.',

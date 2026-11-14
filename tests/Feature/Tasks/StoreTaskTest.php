@@ -31,6 +31,28 @@ class StoreTaskTest extends TestCase
             ->assertSee('No tasks yet.');
     }
 
+    public function test_dashboard_task_modal_lists_personal_and_visible_team_projects(): void
+    {
+        $owner = User::factory()->create();
+        $teamOwner = User::factory()->create();
+        $personalProject = Project::factory()->for($owner, 'owner')->create(['name' => 'Personal']);
+        $teamProject = Project::factory()->for($teamOwner, 'owner')->create(['name' => 'Team Launch']);
+        Task::factory()->for($teamProject)->create([
+            'created_by_id' => $owner->getKey(),
+            'title' => 'Shared team task',
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->get(route('dashboard'));
+
+        $response
+            ->assertOk()
+            ->assertSee('Create a new task')
+            ->assertSee('value="'.$personalProject->getKey().'"', false)
+            ->assertSee('Team Launch')
+            ->assertSee('value="'.$teamProject->getKey().'"', false);
+    }
+
     public function test_dashboard_marks_past_due_incomplete_tasks_as_overdue_but_not_completed_tasks(): void
     {
         $this->travelTo('2026-11-13 12:00:00');

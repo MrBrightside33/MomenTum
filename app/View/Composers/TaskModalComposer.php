@@ -21,7 +21,7 @@ class TaskModalComposer
         if ($user instanceof User) {
             $projects = $user->isAdmin()
                 ? Project::query()->orderBy('name')->get(['id', 'name'])
-                : $user->ownedProjects()->orderBy('name')->get(['id', 'name']);
+                : Project::visibleTo($user)->orderBy('name')->get(['id', 'name']);
             $projects = $projects
                 ->map(fn (Project $project): array => ['id' => $project->getKey(), 'name' => $project->name])
                 ->all();

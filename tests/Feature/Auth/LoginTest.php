@@ -99,6 +99,10 @@ class LoginTest extends TestCase
             'owner_id' => User::query()->where('email', 'taylor@example.com')->value('id'),
             'name' => 'Personal',
         ]);
+        $this->assertDatabaseHas('projects', [
+            'owner_id' => User::query()->where('email', 'taylor@example.com')->value('id'),
+            'name' => 'Team',
+        ]);
         $user = User::query()->where('email', 'taylor@example.com')->firstOrFail();
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'auth.registered',

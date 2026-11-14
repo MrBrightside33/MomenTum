@@ -5,12 +5,7 @@
 
     {{-- Brand message --}}
     <div class="relative max-w-[569px]">
-        <div class="flex items-center gap-3">
-            <span class="flex size-10 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/20">
-                <x-icon name="square-check" class="size-[22px]" />
-            </span>
-            <span class="text-xl font-bold tracking-[-0.5px] text-white">MomenTum</span>
-        </div>
+        <x-brand-logo light />
 
         <div class="mb-2 mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-indigo-100">
             <x-icon name="sparkles" class="size-[15px] text-indigo-100" />

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'projects' => ['Personal', 'Product Design', 'Development', 'Operations', 'Marketing'],
+    'projects' => ['Personal', 'Team', 'Product Design', 'Development', 'Operations', 'Marketing'],
     'priorities' => ['High', 'Medium', 'Low'],
     'statuses' => ['Open', 'In Progress', 'Completed'],
     'team' => [

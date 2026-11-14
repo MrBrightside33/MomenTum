@@ -62,6 +62,18 @@ class TaskObserver
             return;
         }
 
+        // Due-date reminders are intentionally stored as task activity rows, but an explicit
+        // opt-out should prevent the reminder-only metadata from being created for a due-today task.
+        $creator = $task->creator()->first();
+        $isReminderOptedOut = $creator !== null
+            && ($creator->settings['notifications']['due_date_reminders'] ?? true) === false
+            && $task->due_date !== null
+            && $task->due_date->isToday();
+
+        if ($isReminderOptedOut) {
+            return;
+        }
+
         $this->recordActivity($task, 'created', toStatus: $task->status->value, metadata: [
             'progress' => (int) $task->progress,
         ]);

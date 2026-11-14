@@ -11,11 +11,8 @@
         <section class="flex items-center justify-center p-6 lg:p-10">
             <div class="w-full max-w-[448px]">
                 {{-- Mobile brand --}}
-                <a href="{{ route('home') }}" class="mb-8 flex items-center justify-center gap-3 lg:hidden">
-                    <span class="flex size-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
-                        <x-icon name="square-check" class="size-[22px]" />
-                    </span>
-                    <span class="text-xl font-bold text-slate-900">MomenTum</span>
+                <a href="{{ route('home') }}" class="mb-8 flex justify-center lg:hidden" aria-label="MomenTum home">
+                    <x-brand-logo />
                 </a>
 
                 {{-- Sign-up card --}}

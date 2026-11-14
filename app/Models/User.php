@@ -126,6 +126,21 @@ class User extends Authenticatable
         return $query->where('is_active', true);
     }
 
+    public function ensureDefaultProjects(): void
+    {
+        $projectDescriptions = [
+            'Personal' => 'Keep individual goals and focused work in one place.',
+            'Team' => 'Keep shared work, handoffs, and collaboration in one place.',
+        ];
+
+        foreach ($projectDescriptions as $name => $description) {
+            $this->ownedProjects()->firstOrCreate(
+                ['name' => $name],
+                ['description' => $description],
+            );
+        }
+    }
+
     public function defaultPageRoute(): string
     {
         $settings = $this->settings ?? [];

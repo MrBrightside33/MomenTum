@@ -77,10 +77,7 @@ class AuthController extends Controller
 
         $user = DB::transaction(function () use ($validated, $auditContext): User {
             $user = $auditContext->runFor(User::class, fn (): User => User::create($validated));
-            $user->ownedProjects()->create([
-                'name' => 'Personal',
-                'description' => 'Keep individual goals and focused work in one place.',
-            ]);
+            $user->ensureDefaultProjects();
 
             return $user;
         });

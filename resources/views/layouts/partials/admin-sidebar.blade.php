@@ -6,11 +6,8 @@
     aria-hidden="true"
     inert
 >
-    <div class="flex h-20 items-center gap-3 px-6">
-        <span class="flex size-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
-            <x-icon name="check" class="size-[22px]" />
-        </span>
-        <span class="text-xl font-bold tracking-tight text-slate-900">MomenTum</span>
+    <div class="flex h-20 items-center px-6">
+        <x-brand-logo />
     </div>
 
     <nav class="flex-1 overflow-y-auto px-3 py-5">
