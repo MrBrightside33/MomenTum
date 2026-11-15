@@ -1,27 +1,12 @@
 import { updateDashboardTaskStats } from './task-stats';
 import { request } from './http';
 import { setButtonLoading } from './loading';
+import { showToast } from './toast';
 
-let statusMessage;
 const pendingTaskIds = new Set();
 
-const announce = (message, isError = false) => {
-    const taskList = document.getElementById('task-list');
-
-    if (!taskList) {
-        return;
-    }
-
-    if (!statusMessage?.isConnected) {
-        statusMessage = document.createElement('p');
-        statusMessage.className = 'px-5 py-3 text-sm';
-        statusMessage.setAttribute('aria-live', 'polite');
-        taskList.before(statusMessage);
-    }
-
-    statusMessage.classList.toggle('text-red-600', isError);
-    statusMessage.classList.toggle('text-emerald-700', !isError);
-    statusMessage.textContent = message;
+const notify = (message, isError = false) => {
+    showToast(isError ? 'error' : 'success', message);
 };
 
 document.addEventListener('click', async (event) => {
@@ -41,7 +26,7 @@ document.addEventListener('click', async (event) => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
     if (!taskId || !row.dataset.taskStatusUrl || !csrfToken || pendingTaskIds.has(taskId)) {
-        announce('Could not update this task. Refresh the page and try again.', true);
+        notify('Could not update this task. Refresh the page and try again.', true);
         return;
     }
 
@@ -50,6 +35,7 @@ document.addEventListener('click', async (event) => {
     pendingTaskIds.add(taskId);
     const restoreButton = setButtonLoading(button, {
         label: nextStatus === 'Completed' ? 'Completing task…' : 'Reopening task…',
+        showLabel: false,
     });
     let buttonState = 'idle';
 
@@ -66,7 +52,7 @@ document.addEventListener('click', async (event) => {
 
         if (!updatedRow?.matches('[data-task-row]') || markup.content.childElementCount !== 1) {
             console.error('The task status response did not contain a valid task row.');
-            announce('Could not update this task. Please refresh and try again.', true);
+            notify('Could not update this task. Please refresh and try again.', true);
             buttonState = 'error';
             restoreButton('error');
 
@@ -76,10 +62,10 @@ document.addEventListener('click', async (event) => {
         row.replaceWith(updatedRow);
         taskList.dispatchEvent(new CustomEvent('dashboard:tasks-changed'));
         updateDashboardTaskStats(previousStatus, payload.status, 0);
-        announce(payload.message ?? 'Task status updated.');
+        notify(payload.message ?? 'Task status updated.');
     } catch (error) {
         console.error('Task status request failed.', error);
-        announce(error.data?.message ?? error.message ?? 'Could not update this task. Please try again.', true);
+        notify(error.data?.message ?? error.message ?? 'Could not update this task. Please try again.', true);
         buttonState = 'error';
         restoreButton('error');
     } finally {

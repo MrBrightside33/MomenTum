@@ -272,7 +272,7 @@ const restoreButton = (button, state) => {
     }
 };
 
-export const setButtonLoading = (button, { label, loader = 'ring' }) => {
+export const setButtonLoading = (button, { label, loader = 'ring', showLabel = true }) => {
     if (!(button instanceof HTMLButtonElement)) {
         throw new TypeError('setButtonLoading requires a button element.');
     }
@@ -307,10 +307,17 @@ export const setButtonLoading = (button, { label, loader = 'ring' }) => {
     button.addEventListener('keydown', blockInteraction, true);
 
     const content = document.createElement('span');
-    const text = document.createElement('span');
-    content.className = 'inline-flex items-center justify-center gap-2';
-    text.textContent = label;
-    content.append(makeLoader(loader), text);
+    content.className = showLabel
+        ? 'inline-flex items-center justify-center gap-2'
+        : 'inline-flex size-full items-center justify-center';
+    content.append(makeLoader(loader));
+
+    if (showLabel) {
+        const text = document.createElement('span');
+        text.textContent = label;
+        content.append(text);
+    }
+
     button.replaceChildren(content);
 
     return (state = 'idle') => restoreButton(button, state);
